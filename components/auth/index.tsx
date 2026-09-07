@@ -3,10 +3,12 @@
 import { App, Button, Form, Input } from "antd";
 import { LockOutlined, MailOutlined } from "@ant-design/icons";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import ROUTES from "@/constants/routes";
-import { AuthShell, BRAND } from "@/components/auth/auth-shell";
+import { BRAND } from "@/constants/brand";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 type LoginValues = {
   email: string;
@@ -15,6 +17,7 @@ type LoginValues = {
 
 const LoginFeature = () => {
   const { message } = App.useApp();
+  const router = useRouter();
   const [form] = Form.useForm<LoginValues>();
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,9 +28,9 @@ const LoginFeature = () => {
       // await signIn({ email: values.email, password: values.password });
       await new Promise((resolve) => setTimeout(resolve, 900));
       message.success(`Signed in as ${values.email}`);
+      router.push(ROUTES.DASHBOARD);
     } catch {
       message.error("Invalid email or password.");
-    } finally {
       setSubmitting(false);
     }
   };

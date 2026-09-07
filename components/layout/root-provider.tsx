@@ -1,6 +1,7 @@
 "use client";
 
 import { reactQueryConfig } from "@/lib/react-query";
+import { brandTheme } from "@/constants/brand";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App as AntdApp, ConfigProvider } from "antd";
@@ -13,7 +14,7 @@ export const RootProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <AntdRegistry>
-        <ConfigProvider>
+        <ConfigProvider theme={brandTheme}>
           <AntdApp notification={{ maxCount: 3 }}>
             {children}
           </AntdApp>
