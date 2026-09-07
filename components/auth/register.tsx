@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useState } from "react";
 
 import ROUTES from "@/constants/routes";
-import { AuthShell, BRAND } from "@/components/auth/auth-shell";
+import { BRAND } from "@/constants/brand";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 type Role = "SUPERVISOR" | "ADMIN";
 type Team = "TEAM_A" | "TEAM_B";
