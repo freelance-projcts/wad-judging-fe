@@ -3,8 +3,7 @@ const ROUTES = {
   REGISTER: "/register",
 
   DASHBOARD: "/dashboard",
-  STUDENT: "/student",
-  STUDENT_LIST: "/student-list",
+  PLAYERS: "/players",
   EVENT: "/event",
   TEAM: "/team",
   RESULTS: "/results",

@@ -9,8 +9,7 @@ import {
   LogoutOutlined,
   MenuOutlined,
   TeamOutlined,
-  UnorderedListOutlined,
-  UserAddOutlined,
+  TrophyOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
@@ -34,8 +33,7 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { label: "Home", href: ROUTES.DASHBOARD, icon: HomeOutlined, exact: true },
-  { label: "Student", href: ROUTES.STUDENT, icon: UserAddOutlined },
-  { label: "Student List", href: ROUTES.STUDENT_LIST, icon: UnorderedListOutlined },
+  { label: "Players", href: ROUTES.PLAYERS, icon: TrophyOutlined },
   { label: "Event", href: ROUTES.EVENT, icon: CalendarOutlined },
   { label: "Team", href: ROUTES.TEAM, icon: TeamOutlined },
   { label: "Results", href: ROUTES.RESULTS, icon: BarChartOutlined },
