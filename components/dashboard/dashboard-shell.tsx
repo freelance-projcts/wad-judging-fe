@@ -12,6 +12,7 @@ import {
   TrophyOutlined,
   UserOutlined,
 } from "@ant-design/icons";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -50,12 +51,15 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
   const router = useRouter();
   const { modal } = App.useApp();
 
-  const linkClass = (active: boolean) =>
+  const linkClass = (active: boolean, bright = false) =>
     [
       "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+      bright ? "!text-white" : "",
       active
         ? "bg-white/15 font-semibold text-[color:var(--nav-fg-active)]"
-        : "text-[color:var(--nav-fg)] hover:bg-white/10 hover:text-[color:var(--nav-fg-hover)]",
+        : bright
+          ? "hover:bg-white/20 hover:!text-white"
+          : "text-[color:var(--nav-fg)] hover:bg-white/10 hover:text-[color:var(--nav-fg-hover)]",
     ].join(" ");
 
   const handleLogout = () => {
@@ -81,11 +85,16 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
       }
     >
       {/* Brand */}
-      <div className="flex flex-col items-center gap-3 px-6 pb-6 pt-7 text-center">
-        {/* TODO: swap for the provided logo, e.g. <Image src="/logo.png" ... /> */}
-        <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/15 text-lg font-bold tracking-tight">
-          WJ
-        </div>
+      <div className="flex flex-col items-center gap-3 px-4 pb-6 pt-10 text-center">
+        <Image
+          src="/logo-mark.png"
+          alt="WAD Judging"
+          width={131}
+          height={123}
+          priority
+          unoptimized
+          className="h-auto w-full max-w-[80px]"
+        />
         <div>
           <p className="text-base font-bold leading-tight">WAD Judging</p>
           <div
@@ -102,7 +111,7 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
             key={href}
             href={href}
             onClick={onNavigate}
-            className={linkClass(isActive(pathname, { href, exact }))}
+            className={linkClass(isActive(pathname, { href, exact }), true)}
           >
             <Icon />
             <span>{label}</span>
@@ -115,7 +124,7 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
         <Link
           href={ROUTES.PROFILE}
           onClick={onNavigate}
-          className={linkClass(isActive(pathname, { href: ROUTES.PROFILE }))}
+          className={linkClass(isActive(pathname, { href: ROUTES.PROFILE }), true)}
         >
           <UserOutlined />
           <span>Profile</span>

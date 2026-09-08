@@ -2,6 +2,7 @@
 
 import { Typography } from "antd";
 import { CheckCircleOutlined } from "@ant-design/icons";
+import Image from "next/image";
 import type { ReactNode } from "react";
 
 import { BRAND, BRAND_GRADIENT, RAINBOW_BAR } from "@/constants/brand";
@@ -102,9 +103,14 @@ export const AuthShell = ({
             </p>
           </div>
 
-          <div
-            className="h-1.5 w-20 rounded-full"
-            style={{ backgroundImage: RAINBOW_BAR }}
+          <Image
+            src="/logo-mark.png"
+            alt="WAD Judging"
+            width={181}
+            height={123}
+            priority
+            unoptimized
+            className="mb-1 h-auto w-full max-w-[80px]"
           />
           <Title level={2} style={{ marginTop: 16, marginBottom: 4 }}>
             {title}
