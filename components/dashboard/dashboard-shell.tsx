@@ -1,6 +1,6 @@
 "use client";
 
-import { App, Drawer } from "antd";
+import { App, Button, Drawer } from "antd";
 import {
   BarChartOutlined,
   BellOutlined,
@@ -44,12 +44,24 @@ const NAV: NavItem[] = [
 const isActive = (pathname: string, item: Pick<NavItem, "href" | "exact">) =>
   item.exact ? pathname === item.href : pathname.startsWith(item.href);
 
+const useLogout = () => {
+  const router = useRouter();
+  const { modal } = App.useApp();
+
+  return () =>
+    modal.confirm({
+      title: "Log out?",
+      content: "You will need to sign in again to continue.",
+      okText: "Log out",
+      cancelText: "Stay",
+      onOk: () => router.push(ROUTES.LOGIN),
+    });
+};
+
 type SidebarProps = { onNavigate?: () => void };
 
 const Sidebar = ({ onNavigate }: SidebarProps) => {
   const pathname = usePathname();
-  const router = useRouter();
-  const { modal } = App.useApp();
 
   const linkClass = (active: boolean, bright = false) =>
     [
@@ -61,16 +73,6 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
           ? "hover:bg-white/20 hover:!text-white"
           : "text-[color:var(--nav-fg)] hover:bg-white/10 hover:text-[color:var(--nav-fg-hover)]",
     ].join(" ");
-
-  const handleLogout = () => {
-    modal.confirm({
-      title: "Log out?",
-      content: "You will need to sign in again to continue.",
-      okText: "Log out",
-      cancelText: "Stay",
-      onOk: () => router.push(ROUTES.LOGIN),
-    });
-  };
 
   return (
     <div
@@ -129,14 +131,6 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
           <UserOutlined />
           <span>Profile</span>
         </Link>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className={`${linkClass(false)} w-full`}
-        >
-          <LogoutOutlined />
-          <span>Logout</span>
-        </button>
       </div>
     </div>
   );
@@ -144,6 +138,7 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
 
 export const DashboardShell = ({ children }: { children: ReactNode }) => {
   const [open, setOpen] = useState(false);
+  const handleLogout = useLogout();
 
   return (
     <div className="min-h-dvh bg-slate-50">
@@ -166,16 +161,26 @@ export const DashboardShell = ({ children }: { children: ReactNode }) => {
 
       {/* Content */}
       <div className="flex min-h-dvh flex-col lg:pl-64">
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/80 px-4 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 shadow-lg shadow-slate-900/10 backdrop-blur">
           <button
             type="button"
             aria-label="Open menu"
             onClick={() => setOpen(true)}
-            className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100"
+            className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden"
           >
             <MenuOutlined />
           </button>
-          <span className="font-semibold text-slate-800">WAD Judging</span>
+          <span className="font-semibold text-slate-800 lg:hidden">
+            WAD Judging
+          </span>
+          <Button
+            type="text"
+            icon={<LogoutOutlined />}
+            onClick={handleLogout}
+            className="ml-auto !text-slate-600 hover:!bg-slate-100 hover:!text-slate-900"
+          >
+            Logout
+          </Button>
         </header>
 
         <main className="flex-1 px-5 py-6 sm:px-8 sm:py-8">{children}</main>

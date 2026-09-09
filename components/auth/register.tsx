@@ -195,14 +195,6 @@ const RegisterFeature = () => {
                 buttonStyle="solid"
               />
             </Form.Item>
-
-            <Form.Item
-              name="team"
-              label="Team"
-              rules={[{ required: true, message: "Please select a team." }]}
-            >
-              <Select options={TEAM_OPTIONS} placeholder="Select a team" />
-            </Form.Item>
           </div>
 
           <Button
