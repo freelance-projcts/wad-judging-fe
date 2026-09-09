@@ -1,5 +1,5 @@
-import { ComingSoon } from "@/components/dashboard/coming-soon";
+import { EventsFeature } from "@/components/events/events-feature";
 
-const EventPage = () => <ComingSoon title="Event" />;
+const EventPage = () => <EventsFeature />;
 
 export default EventPage;
