@@ -10,7 +10,7 @@ import { BRAND, BRAND_GRADIENT, RAINBOW_BAR } from "@/constants/brand";
 const { Title, Text } = Typography;
 
 const FEATURES = [
-  "Streamlined student evaluations",
+  "Streamlined player evaluations",
   "Real-time performance tracking",
   "Consistent, bias-free scoring",
 ];
@@ -58,7 +58,7 @@ export const AuthShell = ({
             Welcome to WAD Judging
           </h2>
           <p className="mt-4 text-lg text-white/85">
-            The ultimate tool for streamlined student evaluations and performance
+            The ultimate tool for streamlined player evaluations and performance
             tracking.
           </p>
 
@@ -98,7 +98,7 @@ export const AuthShell = ({
             </span>
             <h1 className="mt-2 text-2xl font-bold">Welcome to WAD Judging</h1>
             <p className="mt-1 text-sm text-slate-500">
-              The ultimate tool for streamlined student evaluations and
+              The ultimate tool for streamlined player evaluations and
               performance tracking.
             </p>
           </div>

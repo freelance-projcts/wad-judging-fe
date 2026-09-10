@@ -8,7 +8,6 @@ import {
   HomeOutlined,
   LogoutOutlined,
   MenuOutlined,
-  TeamOutlined,
   TrophyOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -36,7 +35,6 @@ const NAV: NavItem[] = [
   { label: "Home", href: ROUTES.DASHBOARD, icon: HomeOutlined, exact: true },
   { label: "Players", href: ROUTES.PLAYERS, icon: TrophyOutlined },
   { label: "Event", href: ROUTES.EVENT, icon: CalendarOutlined },
-  { label: "Team", href: ROUTES.TEAM, icon: TeamOutlined },
   { label: "Results", href: ROUTES.RESULTS, icon: BarChartOutlined },
   { label: "Notifications", href: ROUTES.NOTIFICATIONS, icon: BellOutlined },
 ];
