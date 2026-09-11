@@ -1,16 +1,18 @@
 "use client";
 
-import { App, Button, Drawer } from "antd";
+import { App, Drawer, Popover } from "antd";
 import {
   BarChartOutlined,
   BellOutlined,
   CalendarOutlined,
+  DownOutlined,
   HomeOutlined,
+  IdcardOutlined,
   LogoutOutlined,
+  MailOutlined,
   MenuOutlined,
-  TeamOutlined,
+  PhoneOutlined,
   TrophyOutlined,
-  UserOutlined,
 } from "@ant-design/icons";
 import Image from "next/image";
 import Link from "next/link";
@@ -23,7 +25,13 @@ import {
 } from "react";
 
 import ROUTES from "@/constants/routes";
-import { NAV_ITEMS, RAINBOW_BAR, SIDEBAR_GRADIENT } from "@/constants/brand";
+import {
+  BRAND_GRADIENT,
+  NAV_ITEMS,
+  RAINBOW_BAR,
+  SIDEBAR_GRADIENT,
+} from "@/constants/brand";
+import { CURRENT_USER, initials } from "@/lib/current-user";
 
 type NavItem = {
   label: string;
@@ -36,7 +44,6 @@ const NAV: NavItem[] = [
   { label: "Home", href: ROUTES.DASHBOARD, icon: HomeOutlined, exact: true },
   { label: "Players", href: ROUTES.PLAYERS, icon: TrophyOutlined },
   { label: "Event", href: ROUTES.EVENT, icon: CalendarOutlined },
-  { label: "Team", href: ROUTES.TEAM, icon: TeamOutlined },
   { label: "Results", href: ROUTES.RESULTS, icon: BarChartOutlined },
   { label: "Notifications", href: ROUTES.NOTIFICATIONS, icon: BellOutlined },
 ];
@@ -120,25 +127,121 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
           </Link>
         ))}
       </nav>
+    </div>
+  );
+};
 
-      {/* Footer actions */}
-      <div className="space-y-1 border-t border-white/10 px-3 py-3">
-        <Link
-          href={ROUTES.PROFILE}
-          onClick={onNavigate}
-          className={linkClass(isActive(pathname, { href: ROUTES.PROFILE }), true)}
+type ProfileFieldRow = {
+  label: string;
+  value: string;
+  icon: ComponentType<{ style?: CSSProperties }>;
+};
+
+const ProfileRow = ({ label, value, icon: Icon }: ProfileFieldRow) => (
+  <div className="flex items-center gap-3 px-4 py-2.5">
+    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+      <Icon style={{ fontSize: 14 }} />
+    </span>
+    <div className="min-w-0">
+      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+      <p className="truncate text-sm font-medium text-slate-800">{value}</p>
+    </div>
+  </div>
+);
+
+const ProfileCard = () => {
+  const handleLogout = useLogout();
+  const user = CURRENT_USER;
+
+  const fields: ProfileFieldRow[] = [
+    { label: "Mobile", value: user.mobile, icon: PhoneOutlined },
+    { label: "Email", value: user.email, icon: MailOutlined },
+    { label: "Role", value: user.role, icon: IdcardOutlined },
+  ];
+
+  return (
+    <div className="w-72 overflow-hidden rounded-xl">
+      <div
+        className="flex items-center gap-3 px-4 py-4"
+        style={{ backgroundImage: BRAND_GRADIENT }}
+      >
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-sm font-bold text-[#1E40AF] shadow">
+          {initials(user.fullName)}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-white">
+            {user.fullName}
+          </p>
+          <p className="truncate text-xs text-white/75">{user.email}</p>
+        </div>
+      </div>
+
+      <div className="divide-y divide-slate-100 bg-white">
+        {fields.map((field) => (
+          <ProfileRow key={field.label} {...field} />
+        ))}
+      </div>
+
+      <div className="border-t border-slate-100 bg-white p-2">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
         >
-          <UserOutlined />
-          <span>Profile</span>
-        </Link>
+          <LogoutOutlined />
+          Logout
+        </button>
       </div>
     </div>
   );
 };
 
+const ProfileMenu = () => {
+  const [open, setOpen] = useState(false);
+  const user = CURRENT_USER;
+
+  return (
+    <Popover
+      content={<ProfileCard />}
+      trigger="click"
+      open={open}
+      onOpenChange={setOpen}
+      placement="bottomRight"
+      arrow={false}
+      styles={{ content: { padding: 0, overflow: "hidden", borderRadius: 12 } }}
+    >
+      <button
+        type="button"
+        className={[
+          "ml-auto flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 transition-colors",
+          open ? "bg-slate-100" : "hover:bg-slate-100",
+        ].join(" ")}
+      >
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#E7ECFA] text-xs font-bold text-[#1E40AF]">
+          {initials(user.fullName)}
+        </span>
+        <span className="hidden text-left leading-tight sm:block">
+          <span className="block text-sm font-semibold text-slate-800">
+            {user.fullName}
+          </span>
+          <span className="block text-xs text-slate-500">{user.role}</span>
+        </span>
+        <DownOutlined
+          className={[
+            "hidden transition-transform sm:block",
+            open ? "rotate-180" : "",
+          ].join(" ")}
+          style={{ fontSize: 10, color: "#94a3b8" }}
+        />
+      </button>
+    </Popover>
+  );
+};
+
 export const DashboardShell = ({ children }: { children: ReactNode }) => {
   const [open, setOpen] = useState(false);
-  const handleLogout = useLogout();
 
   return (
     <div className="min-h-dvh bg-slate-50">
@@ -173,14 +276,7 @@ export const DashboardShell = ({ children }: { children: ReactNode }) => {
           <span className="font-semibold text-slate-800 lg:hidden">
             WAD Judging
           </span>
-          <Button
-            type="text"
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-            className="ml-auto !text-slate-600 hover:!bg-slate-100 hover:!text-slate-900"
-          >
-            Logout
-          </Button>
+          <ProfileMenu />
         </header>
 
         <main className="flex-1 px-5 py-6 sm:px-8 sm:py-8">{children}</main>

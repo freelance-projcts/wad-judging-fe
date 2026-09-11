@@ -11,14 +11,14 @@ const initials = (name: string) => {
   return (first + last).toUpperCase();
 };
 
-type StudentCardProps = {
+type PlayerCardProps = {
   name: string;
   score: number;
   /** Used only to vary the avatar tint. */
   index?: number;
 };
 
-export const StudentCard = ({ name, score, index = 0 }: StudentCardProps) => {
+export const PlayerCard = ({ name, score, index = 0 }: PlayerCardProps) => {
   const tint = TINTS[index % TINTS.length];
 
   return (

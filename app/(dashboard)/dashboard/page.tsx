@@ -3,14 +3,14 @@
 import { BellOutlined, CalendarOutlined, TeamOutlined } from "@ant-design/icons";
 
 import { StatCard } from "@/components/dashboard/stat-card";
-import { StudentCard } from "@/components/dashboard/student-card";
+import { PlayerCard } from "@/components/dashboard/player-card";
 
 // --- Mock data (replace with API results) ---
 const USER_NAME = "Dilshan Piumika";
 
 const STATS = [
   {
-    label: "Total Students",
+    label: "Total Players",
     value: 100,
     icon: TeamOutlined,
     color: "#1E40AF",
@@ -32,7 +32,7 @@ const STATS = [
   },
 ];
 
-const RECENT_STUDENTS = [
+const RECENT_PLAYERS = [
   { name: "K.M.D.N Bandara", score: 69 },
   { name: "L.S Jayakodi", score: 71 },
   { name: "A.A.S.J Amarasinghe", score: 70 },
@@ -70,11 +70,11 @@ const DashboardPage = () => {
 
       <section>
         <h2 className="mb-4 text-lg font-semibold text-slate-800">
-          Recently Added Students
+          Recently Added Players
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {RECENT_STUDENTS.map((student, i) => (
-            <StudentCard key={student.name} index={i} {...student} />
+          {RECENT_PLAYERS.map((player, i) => (
+            <PlayerCard key={player.name} index={i} {...player} />
           ))}
         </div>
       </section>
