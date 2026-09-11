@@ -1,5 +1,5 @@
-import { ComingSoon } from "@/components/dashboard/coming-soon";
+import { ProfileFeature } from "@/components/profile/profile-feature";
 
-const ProfilePage = () => <ComingSoon title="Profile" />;
+const ProfilePage = () => <ProfileFeature />;
 
 export default ProfilePage;
