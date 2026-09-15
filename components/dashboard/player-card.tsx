@@ -13,12 +13,13 @@ const initials = (name: string) => {
 
 type PlayerCardProps = {
   name: string;
-  score: number;
+  /** Secondary line under the name (e.g. the player's id). */
+  subtitle: string;
   /** Used only to vary the avatar tint. */
   index?: number;
 };
 
-export const PlayerCard = ({ name, score, index = 0 }: PlayerCardProps) => {
+export const PlayerCard = ({ name, subtitle, index = 0 }: PlayerCardProps) => {
   const tint = TINTS[index % TINTS.length];
 
   return (
@@ -34,7 +35,7 @@ export const PlayerCard = ({ name, score, index = 0 }: PlayerCardProps) => {
         {initials(name)}
       </Avatar>
       <p className="mt-3 truncate font-semibold text-slate-800">{name}</p>
-      <p className="text-sm text-slate-400">{score}</p>
+      <p className="truncate text-sm text-slate-400">{subtitle}</p>
     </div>
   );
 };

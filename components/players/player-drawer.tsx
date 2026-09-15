@@ -17,12 +17,13 @@ type PlayerDrawerProps = {
   player: Player | null;
   onClose: () => void;
   onSubmit: (values: PlayerFormValues) => void;
+  submitting?: boolean;
 };
 
 const DEFAULTS: PlayerFormValues = {
-  id: "",
-  name: "",
-  team: "TEAM_A",
+  code: "",
+  fullName: "",
+  team: undefined,
   gender: "MALE",
   province: "WESTERN",
 };
@@ -32,6 +33,7 @@ export const PlayerDrawer = ({
   player,
   onClose,
   onSubmit,
+  submitting,
 }: PlayerDrawerProps) => {
   const [form] = Form.useForm<PlayerFormValues>();
   const isEdit = Boolean(player);
@@ -39,7 +41,17 @@ export const PlayerDrawer = ({
   useEffect(() => {
     if (!open) return;
     form.resetFields();
-    form.setFieldsValue(player ?? DEFAULTS);
+    form.setFieldsValue(
+      player
+        ? {
+            code: player.code,
+            fullName: player.fullName,
+            team: player.team ?? undefined,
+            gender: player.gender,
+            province: player.province,
+          }
+        : DEFAULTS,
+    );
   }, [open, player, form]);
 
   return (
@@ -51,7 +63,7 @@ export const PlayerDrawer = ({
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
-          <Button type="primary" onClick={form.submit}>
+          <Button type="primary" loading={submitting} onClick={form.submit}>
             {isEdit ? "Save changes" : "Create"}
           </Button>
         </div>
@@ -62,30 +74,33 @@ export const PlayerDrawer = ({
         layout="vertical"
         requiredMark={false}
         initialValues={DEFAULTS}
-        onFinish={onSubmit}
+        // `team` must be sent as `null` (not omitted) when cleared, since
+        // JSON.stringify drops `undefined` keys and the backend would then
+        // read a cleared team as "no change" on PATCH instead of "unassign".
+        onFinish={(values) => onSubmit({ ...values, team: values.team ?? null })}
       >
         <Form.Item
-          name="id"
+          name="code"
           label="Id"
           rules={[{ required: true, message: "Id is required." }]}
         >
-          <Input placeholder="WAD-1001" disabled={isEdit} />
+          <Input placeholder="STU-0001" disabled={isEdit} autoFocus={!isEdit} />
         </Form.Item>
 
         <Form.Item
-          name="name"
+          name="fullName"
           label="Full name"
           rules={[{ required: true, message: "Full name is required." }]}
         >
-          <Input placeholder="Jane Doe" autoFocus />
+          <Input placeholder="Jane Doe" />
         </Form.Item>
 
-        <Form.Item
-          name="team"
-          label="Team"
-          rules={[{ required: true, message: "Please select a team." }]}
-        >
-          <Select options={TEAM_OPTIONS} placeholder="Select a team" />
+        <Form.Item name="team" label="Team">
+          <Select
+            options={TEAM_OPTIONS}
+            placeholder="Unassigned"
+            allowClear
+          />
         </Form.Item>
 
         <Form.Item

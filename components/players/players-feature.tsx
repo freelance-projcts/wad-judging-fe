@@ -5,10 +5,10 @@ import {
   EditOutlined,
   FilterOutlined,
   PlusOutlined,
-  SearchOutlined,
   UpOutlined,
 } from "@ant-design/icons";
 import {
+  Alert,
   App,
   Button,
   Input,
@@ -19,11 +19,11 @@ import {
   Tag,
   type TableProps,
 } from "antd";
-import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { PlayerDrawer } from "./player-drawer";
 import {
-  MOCK_PLAYERS,
   PROVINCE_OPTIONS,
   TEAM_OPTIONS,
   genderLabel,
@@ -35,6 +35,15 @@ import {
   type Province,
   type Team,
 } from "./types";
+import {
+  createStudent,
+  deleteStudent,
+  listStudents,
+  updateStudent,
+} from "@/lib/api/students";
+import { ApiError } from "@/lib/api/client";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 
 type Filters = {
   name?: string;
@@ -44,11 +53,15 @@ type Filters = {
 };
 
 const INITIAL_FILTERS: Filters = {};
+const STUDENTS_QUERY_KEY = "students";
 
 export const PlayersFeature = () => {
   const { message } = App.useApp();
+  const queryClient = useQueryClient();
 
-  const [players, setPlayers] = useState<Player[]>(MOCK_PLAYERS);
+  const { data: profile } = useCurrentUser();
+  const isAdmin = profile?.user.role === "ADMIN";
+
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -57,17 +70,65 @@ export const PlayersFeature = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Player | null>(null);
 
-  const filtered = useMemo(() => {
-    const name = filters.name?.trim().toLowerCase() ?? "";
-    const id = filters.id?.trim().toLowerCase() ?? "";
-    return players.filter((p) => {
-      if (name && !p.name.toLowerCase().includes(name)) return false;
-      if (id && !p.id.toLowerCase().includes(id)) return false;
-      if (filters.team && p.team !== filters.team) return false;
-      if (filters.province && p.province !== filters.province) return false;
-      return true;
-    });
-  }, [players, filters]);
+  // The backend only exposes a single `search` term matched against both
+  // name and id, so when both filters are filled in, the Id one wins.
+  const search = useDebouncedValue(filters.id || filters.name || "", 350);
+
+  const studentsQuery = useQuery({
+    queryKey: [
+      STUDENTS_QUERY_KEY,
+      { page, pageSize, search, team: filters.team, province: filters.province },
+    ],
+    queryFn: () =>
+      listStudents({
+        page,
+        pageSize,
+        search: search || undefined,
+        team: filters.team,
+        province: filters.province,
+      }),
+    placeholderData: (previous) => previous,
+  });
+
+  const invalidateStudents = () =>
+    queryClient.invalidateQueries({ queryKey: [STUDENTS_QUERY_KEY] });
+
+  const createMutation = useMutation({
+    mutationFn: createStudent,
+    onSuccess: () => {
+      invalidateStudents();
+      setPage(1);
+      message.success("Player added.");
+      closeDrawer();
+    },
+    onError: (err) =>
+      message.error(
+        err instanceof ApiError ? err.message : "Could not add player.",
+      ),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: PlayerFormValues }) =>
+      updateStudent(id, values),
+    onSuccess: () => {
+      invalidateStudents();
+      message.success("Player updated.");
+      closeDrawer();
+    },
+    onError: (err) =>
+      message.error(
+        err instanceof ApiError ? err.message : "Could not update player.",
+      ),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteStudent,
+    onSuccess: () => invalidateStudents(),
+    onError: (err) =>
+      message.error(
+        err instanceof ApiError ? err.message : "Could not remove player.",
+      ),
+  });
 
   const updateFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => {
     setFilters((f) => ({ ...f, [key]: value }));
@@ -91,25 +152,16 @@ export const PlayersFeature = () => {
 
   const handleSubmit = (values: PlayerFormValues) => {
     if (editing) {
-      setPlayers((prev) =>
-        prev.map((p) => (p.id === editing.id ? { ...p, ...values } : p)),
-      );
-      message.success("Player updated.");
+      updateMutation.mutate({ id: editing.id, values });
     } else {
-      if (players.some((p) => p.id === values.id)) {
-        message.error(`A player with Id "${values.id}" already exists.`);
-        return;
-      }
-      setPlayers((prev) => [values, ...prev]);
-      setPage(1);
-      message.success("Player added.");
+      createMutation.mutate(values);
     }
-    closeDrawer();
   };
 
   const handleDelete = (player: Player) => {
-    setPlayers((prev) => prev.filter((p) => p.id !== player.id));
-    message.success(`Removed ${player.name}.`);
+    deleteMutation.mutate(player.id, {
+      onSuccess: () => message.success(`Removed ${player.fullName}.`),
+    });
   };
 
   const resetFilters = () => {
@@ -118,18 +170,20 @@ export const PlayersFeature = () => {
   };
 
   const columns: TableProps<Player>["columns"] = [
-    { title: "Id", dataIndex: "id", key: "id" },
+    { title: "Id", dataIndex: "code", key: "code" },
     {
       title: "Full Name",
-      dataIndex: "name",
-      key: "name",
-      sorter: (a, b) => a.name.localeCompare(b.name),
+      dataIndex: "fullName",
+      key: "fullName",
+      sorter: (a, b) => a.fullName.localeCompare(b.fullName),
     },
     {
       title: "Team",
       dataIndex: "team",
       key: "team",
-      render: (team: Team) => <Tag color="blue">{teamLabel(team)}</Tag>,
+      render: (team: Team | null) => (
+        <Tag color={team ? "blue" : "default"}>{teamLabel(team)}</Tag>
+      ),
     },
     {
       title: "Gender",
@@ -143,31 +197,38 @@ export const PlayersFeature = () => {
       key: "province",
       render: (province: Province) => provinceLabel(province),
     },
-    {
-      title: "Actions",
-      key: "actions",
-      width: 96,
-      render: (_, player) => (
-        <Space>
-          <Button
-            type="text"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => openEdit(player)}
-          />
-          <Popconfirm
-            title="Remove this player?"
-            description={player.name}
-            okText="Remove"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDelete(player)}
-          >
-            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </Space>
-      ),
-    },
+    ...(isAdmin
+      ? [
+          {
+            title: "Actions",
+            key: "actions",
+            width: 96,
+            render: (_: unknown, player: Player) => (
+              <Space>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => openEdit(player)}
+                />
+                <Popconfirm
+                  title="Remove this player?"
+                  description={player.fullName}
+                  okText="Remove"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleDelete(player)}
+                >
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>
+              </Space>
+            ),
+          },
+        ]
+      : []),
   ];
+
+  const players = studentsQuery.data?.items ?? [];
+  const total = studentsQuery.data?.total ?? 0;
 
   return (
     <div className="mx-auto space-y-4">
@@ -192,14 +253,16 @@ export const PlayersFeature = () => {
             />
           </Button>
 
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className="ml-auto"
-            onClick={openCreate}
-          >
-            Add Player
-          </Button>
+          {isAdmin ? (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              className="ml-auto"
+              onClick={openCreate}
+            >
+              Add Player
+            </Button>
+          ) : null}
         </div>
 
         {/* Filter panel */}
@@ -266,33 +329,50 @@ export const PlayersFeature = () => {
 
         {/* Table */}
         <div className="mt-5">
-          <Table<Player>
-            columns={columns}
-            dataSource={filtered}
-            rowKey="id"
-            scroll={{ x: "max-content" }}
-            pagination={{
-              current: page,
-              pageSize,
-              total: filtered.length,
-              showSizeChanger: true,
-              onChange: (nextPage, nextPageSize) => {
-                setPage(nextPage);
-                setPageSize(nextPageSize);
-              },
-              showTotal: (total, range) =>
-                `Showing ${range[0]}–${range[1]} of ${total} players`,
-            }}
-          />
+          {studentsQuery.isError ? (
+            <Alert
+              type="error"
+              showIcon
+              message="Could not load players."
+              description={
+                studentsQuery.error instanceof ApiError
+                  ? studentsQuery.error.message
+                  : undefined
+              }
+            />
+          ) : (
+            <Table<Player>
+              columns={columns}
+              dataSource={players}
+              rowKey="id"
+              loading={studentsQuery.isFetching}
+              scroll={{ x: "max-content" }}
+              pagination={{
+                current: page,
+                pageSize,
+                total,
+                showSizeChanger: true,
+                onChange: (nextPage, nextPageSize) => {
+                  setPage(nextPage);
+                  setPageSize(nextPageSize);
+                },
+                showTotal: (t, range) =>
+                  `Showing ${range[0]}–${range[1]} of ${t} players`,
+              }}
+            />
+          )}
         </div>
       </div>
 
-      <PlayerDrawer
-        open={drawerOpen}
-        player={editing}
-        onClose={closeDrawer}
-        onSubmit={handleSubmit}
-      />
+      {isAdmin ? (
+        <PlayerDrawer
+          open={drawerOpen}
+          player={editing}
+          onClose={closeDrawer}
+          onSubmit={handleSubmit}
+          submitting={createMutation.isPending || updateMutation.isPending}
+        />
+      ) : null}
     </div>
   );
 };

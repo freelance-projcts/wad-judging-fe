@@ -15,6 +15,7 @@ type EventDrawerProps = {
   event: WadEvent | null;
   onClose: () => void;
   onSubmit: (values: EventFormValues) => void;
+  submitting?: boolean;
 };
 
 const DEFAULTS: EventFormValues = {
@@ -27,6 +28,7 @@ export const EventDrawer = ({
   event,
   onClose,
   onSubmit,
+  submitting,
 }: EventDrawerProps) => {
   const [form] = Form.useForm<EventFormValues>();
   const isEdit = Boolean(event);
@@ -48,7 +50,7 @@ export const EventDrawer = ({
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
-          <Button type="primary" onClick={form.submit}>
+          <Button type="primary" loading={submitting} onClick={form.submit}>
             {isEdit ? "Save changes" : "Create"}
           </Button>
         </div>

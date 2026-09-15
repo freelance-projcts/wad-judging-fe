@@ -1,16 +1,16 @@
 "use client";
 
-import { App, Button, ConfigProvider, Form, Input, Radio, Select } from "antd";
+import { App, Button, ConfigProvider, Form, Input } from "antd";
 import { LockOutlined, MailOutlined, PhoneOutlined } from "@ant-design/icons";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import ROUTES from "@/constants/routes";
 import { BRAND } from "@/constants/brand";
 import { AuthShell } from "@/components/auth/auth-shell";
-
-type Role = "SUPERVISOR" | "ADMIN";
-type Team = "TEAM_A" | "TEAM_B";
+import { register } from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/client";
 
 type RegisterValues = {
   firstName: string;
@@ -19,34 +19,33 @@ type RegisterValues = {
   email: string;
   password: string;
   confirmPassword: string;
-  role: Role;
-  team: Team;
 };
 
-const ROLE_OPTIONS = [
-  { label: "Supervisor", value: "SUPERVISOR" },
-  { label: "Admin", value: "ADMIN" },
-];
-
-const TEAM_OPTIONS = [
-  { label: "Team A", value: "TEAM_A" },
-  { label: "Team B", value: "TEAM_B" },
-];
-
+// Public self-registration always creates a JUDGE account — the backend
+// enforces this too, so there's no role to pick here.
 const RegisterFeature = () => {
   const { message } = App.useApp();
+  const router = useRouter();
   const [form] = Form.useForm<RegisterValues>();
   const [submitting, setSubmitting] = useState(false);
 
   const onFinish = async (values: RegisterValues) => {
     setSubmitting(true);
     try {
-      // TODO: replace with real API call, e.g.
-      // await register({ ...values, confirmPassword: undefined });
-      await new Promise((resolve) => setTimeout(resolve, 900));
-      message.success(`Account created for ${values.email}`);
-    } catch {
-      message.error("Could not create your account. Please try again.");
+      await register({
+        name: `${values.firstName.trim()} ${values.lastName.trim()}`.trim(),
+        email: values.email,
+        password: values.password,
+        mobileNumber: values.mobile,
+      });
+      message.success("Account created. Please sign in.");
+      router.push(ROUTES.LOGIN);
+    } catch (err) {
+      message.error(
+        err instanceof ApiError
+          ? err.message
+          : "Could not create your account. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -111,7 +110,8 @@ const RegisterFeature = () => {
               rules={[
                 { required: true, message: "Mobile number is required." },
                 {
-                  pattern: /^[0-9+\-\s()]{7,20}$/,
+                  // Matches the backend's mobileNumber validation exactly.
+                  pattern: /^[0-9+\-\s]{7,15}$/,
                   message: "Enter a valid mobile number.",
                 },
               ]}
@@ -179,20 +179,6 @@ const RegisterFeature = () => {
                 prefix={<LockOutlined className="text-slate-400" />}
                 placeholder="Re-enter your password"
                 autoComplete="new-password"
-              />
-            </Form.Item>
-          </div>
-
-          <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-            <Form.Item
-              name="role"
-              label="Role"
-              rules={[{ required: true, message: "Please choose a role." }]}
-            >
-              <Radio.Group
-                options={ROLE_OPTIONS}
-                optionType="button"
-                buttonStyle="solid"
               />
             </Form.Item>
           </div>

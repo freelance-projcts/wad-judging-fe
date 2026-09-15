@@ -2,6 +2,7 @@
 
 import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import {
+  Alert,
   App,
   Button,
   Popconfirm,
@@ -10,28 +11,45 @@ import {
   Tag,
   type TableProps,
 } from "antd";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { EventDrawer } from "./event-drawer";
 import {
-  MOCK_EVENTS,
   eventGenderLabel,
-  nextEventId,
   type EventFormValues,
   type EventGender,
   type WadEvent,
 } from "./types";
+import {
+  createEvent,
+  deleteEvent,
+  listEvents,
+  updateEvent,
+} from "@/lib/api/events";
+import { ApiError } from "@/lib/api/client";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
 
 const GENDER_TAG_COLOR: Record<EventGender, string> = {
   MALE: "blue",
   FEMALE: "magenta",
-  MIXED: "gold",
+  OTHER: "gold",
 };
+
+const EVENTS_QUERY_KEY = ["events"] as const;
 
 export const EventsFeature = () => {
   const { message } = App.useApp();
+  const queryClient = useQueryClient();
 
-  const [events, setEvents] = useState<WadEvent[]>(MOCK_EVENTS);
+  const { data: profile } = useCurrentUser();
+  const isAdmin = profile?.user.role === "ADMIN";
+
+  const eventsQuery = useQuery({
+    queryKey: EVENTS_QUERY_KEY,
+    queryFn: () => listEvents(),
+  });
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -52,27 +70,60 @@ export const EventsFeature = () => {
     setEditing(null);
   };
 
-  const handleSubmit = (values: EventFormValues) => {
-    if (editing) {
-      setEvents((prev) =>
-        prev.map((e) => (e.id === editing.id ? { ...e, ...values } : e)),
-      );
-      message.success("Event updated.");
-    } else {
-      setEvents((prev) => [{ id: nextEventId(prev), ...values }, ...prev]);
+  const invalidateEvents = () =>
+    queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
+
+  const createMutation = useMutation({
+    mutationFn: createEvent,
+    onSuccess: () => {
+      invalidateEvents();
       setPage(1);
       message.success("Event added.");
+      closeDrawer();
+    },
+    onError: (err) =>
+      message.error(err instanceof ApiError ? err.message : "Could not add event."),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: EventFormValues }) =>
+      updateEvent(id, values),
+    onSuccess: () => {
+      invalidateEvents();
+      message.success("Event updated.");
+      closeDrawer();
+    },
+    onError: (err) =>
+      message.error(
+        err instanceof ApiError ? err.message : "Could not update event.",
+      ),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteEvent,
+    onSuccess: () => invalidateEvents(),
+    onError: (err) =>
+      message.error(
+        err instanceof ApiError ? err.message : "Could not remove event.",
+      ),
+  });
+
+  const handleSubmit = (values: EventFormValues) => {
+    if (editing) {
+      updateMutation.mutate({ id: editing.id, values });
+    } else {
+      createMutation.mutate(values);
     }
-    closeDrawer();
   };
 
   const handleDelete = (event: WadEvent) => {
-    setEvents((prev) => prev.filter((e) => e.id !== event.id));
-    message.success(`Removed ${event.name}.`);
+    deleteMutation.mutate(event.id, {
+      onSuccess: () => message.success(`Removed ${event.name}.`),
+    });
   };
 
   const columns: TableProps<WadEvent>["columns"] = [
-    { title: "Id", dataIndex: "id", key: "id", width: 140 },
+    { title: "Id", dataIndex: "id", key: "id", ellipsis: true },
     {
       title: "Event name",
       dataIndex: "name",
@@ -88,31 +139,37 @@ export const EventsFeature = () => {
         <Tag color={GENDER_TAG_COLOR[gender]}>{eventGenderLabel(gender)}</Tag>
       ),
     },
-    {
-      title: "Actions",
-      key: "actions",
-      width: 96,
-      render: (_, event) => (
-        <Space>
-          <Button
-            type="text"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => openEdit(event)}
-          />
-          <Popconfirm
-            title="Remove this event?"
-            description={event.name}
-            okText="Remove"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDelete(event)}
-          >
-            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </Space>
-      ),
-    },
+    ...(isAdmin
+      ? [
+          {
+            title: "Actions",
+            key: "actions",
+            width: 96,
+            render: (_: unknown, event: WadEvent) => (
+              <Space>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => openEdit(event)}
+                />
+                <Popconfirm
+                  title="Remove this event?"
+                  description={event.name}
+                  okText="Remove"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleDelete(event)}
+                >
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>
+              </Space>
+            ),
+          },
+        ]
+      : []),
   ];
+
+  const events = eventsQuery.data ?? [];
 
   return (
     <div className="mx-auto space-y-4">
@@ -122,46 +179,65 @@ export const EventsFeature = () => {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className="ml-auto"
-            onClick={openCreate}
-          >
-            Add Event
-          </Button>
-        </div>
+        {isAdmin ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              className="ml-auto"
+              onClick={openCreate}
+            >
+              Add Event
+            </Button>
+          </div>
+        ) : null}
 
         {/* Table */}
         <div className="mt-5">
-          <Table<WadEvent>
-            columns={columns}
-            dataSource={events}
-            rowKey="id"
-            scroll={{ x: "max-content" }}
-            pagination={{
-              current: page,
-              pageSize,
-              total: events.length,
-              showSizeChanger: true,
-              onChange: (nextPage, nextPageSize) => {
-                setPage(nextPage);
-                setPageSize(nextPageSize);
-              },
-              showTotal: (total, range) =>
-                `Showing ${range[0]}–${range[1]} of ${total} events`,
-            }}
-          />
+          {eventsQuery.isError ? (
+            <Alert
+              type="error"
+              showIcon
+              message="Could not load events."
+              description={
+                eventsQuery.error instanceof ApiError
+                  ? eventsQuery.error.message
+                  : undefined
+              }
+            />
+          ) : (
+            <Table<WadEvent>
+              columns={columns}
+              dataSource={events}
+              rowKey="id"
+              loading={eventsQuery.isLoading}
+              scroll={{ x: "max-content" }}
+              pagination={{
+                current: page,
+                pageSize,
+                total: events.length,
+                showSizeChanger: true,
+                onChange: (nextPage, nextPageSize) => {
+                  setPage(nextPage);
+                  setPageSize(nextPageSize);
+                },
+                showTotal: (total, range) =>
+                  `Showing ${range[0]}–${range[1]} of ${total} events`,
+              }}
+            />
+          )}
         </div>
       </div>
 
-      <EventDrawer
-        open={drawerOpen}
-        event={editing}
-        onClose={closeDrawer}
-        onSubmit={handleSubmit}
-      />
+      {isAdmin ? (
+        <EventDrawer
+          open={drawerOpen}
+          event={editing}
+          onClose={closeDrawer}
+          onSubmit={handleSubmit}
+          submitting={createMutation.isPending || updateMutation.isPending}
+        />
+      ) : null}
     </div>
   );
 };

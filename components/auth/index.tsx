@@ -5,10 +5,14 @@ import { LockOutlined, MailOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import ROUTES from "@/constants/routes";
 import { BRAND } from "@/constants/brand";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { login } from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/client";
+import { CURRENT_USER_QUERY_KEY } from "@/lib/hooks/use-current-user";
 
 type LoginValues = {
   email: string;
@@ -18,19 +22,21 @@ type LoginValues = {
 const LoginFeature = () => {
   const { message } = App.useApp();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [form] = Form.useForm<LoginValues>();
   const [submitting, setSubmitting] = useState(false);
 
   const onFinish = async (values: LoginValues) => {
     setSubmitting(true);
     try {
-      // TODO: replace with real API call, e.g.
-      // await signIn({ email: values.email, password: values.password });
-      await new Promise((resolve) => setTimeout(resolve, 900));
-      message.success(`Signed in as ${values.email}`);
+      await login(values);
+      await queryClient.invalidateQueries({ queryKey: CURRENT_USER_QUERY_KEY });
+      message.success("Signed in successfully.");
       router.push(ROUTES.DASHBOARD);
-    } catch {
-      message.error("Invalid email or password.");
+    } catch (err) {
+      message.error(
+        err instanceof ApiError ? err.message : "Invalid email or password.",
+      );
       setSubmitting(false);
     }
   };

@@ -14,6 +14,7 @@ import {
   PhoneOutlined,
   TrophyOutlined,
 } from "@ant-design/icons";
+import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -31,7 +32,9 @@ import {
   RAINBOW_BAR,
   SIDEBAR_GRADIENT,
 } from "@/constants/brand";
-import { CURRENT_USER, initials } from "@/lib/current-user";
+import { initials } from "@/lib/current-user";
+import { logout, roleLabel } from "@/lib/api/auth";
+import { CURRENT_USER_QUERY_KEY, useCurrentUser } from "@/lib/hooks/use-current-user";
 
 type NavItem = {
   label: string;
@@ -53,6 +56,7 @@ const isActive = (pathname: string, item: Pick<NavItem, "href" | "exact">) =>
 
 const useLogout = () => {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { modal } = App.useApp();
 
   return () =>
@@ -61,7 +65,15 @@ const useLogout = () => {
       content: "You will need to sign in again to continue.",
       okText: "Log out",
       cancelText: "Stay",
-      onOk: () => router.push(ROUTES.LOGIN),
+      onOk: async () => {
+        try {
+          await logout();
+        } catch {
+          // Session may already be gone server-side — clear it locally regardless.
+        }
+        queryClient.removeQueries({ queryKey: CURRENT_USER_QUERY_KEY });
+        router.replace(ROUTES.LOGIN);
+      },
     });
 };
 
@@ -153,12 +165,13 @@ const ProfileRow = ({ label, value, icon: Icon }: ProfileFieldRow) => (
 
 const ProfileCard = () => {
   const handleLogout = useLogout();
-  const user = CURRENT_USER;
+  const { data: profile } = useCurrentUser();
+  const user = profile?.user;
 
   const fields: ProfileFieldRow[] = [
-    { label: "Mobile", value: user.mobile, icon: PhoneOutlined },
-    { label: "Email", value: user.email, icon: MailOutlined },
-    { label: "Role", value: user.role, icon: IdcardOutlined },
+    { label: "Mobile", value: user?.mobileNumber || "—", icon: PhoneOutlined },
+    { label: "Email", value: user?.email ?? "", icon: MailOutlined },
+    { label: "Role", value: user ? roleLabel(user.role) : "", icon: IdcardOutlined },
   ];
 
   return (
@@ -168,13 +181,13 @@ const ProfileCard = () => {
         style={{ backgroundImage: BRAND_GRADIENT }}
       >
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-sm font-bold text-[#1E40AF] shadow">
-          {initials(user.fullName)}
+          {initials(user?.name ?? "")}
         </span>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-white">
-            {user.fullName}
+            {user?.name}
           </p>
-          <p className="truncate text-xs text-white/75">{user.email}</p>
+          <p className="truncate text-xs text-white/75">{user?.email}</p>
         </div>
       </div>
 
@@ -200,7 +213,8 @@ const ProfileCard = () => {
 
 const ProfileMenu = () => {
   const [open, setOpen] = useState(false);
-  const user = CURRENT_USER;
+  const { data: profile } = useCurrentUser();
+  const user = profile?.user;
 
   return (
     <Popover
@@ -220,13 +234,15 @@ const ProfileMenu = () => {
         ].join(" ")}
       >
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#E7ECFA] text-xs font-bold text-[#1E40AF]">
-          {initials(user.fullName)}
+          {initials(user?.name ?? "")}
         </span>
         <span className="hidden text-left leading-tight sm:block">
           <span className="block text-sm font-semibold text-slate-800">
-            {user.fullName}
+            {user?.name}
           </span>
-          <span className="block text-xs text-slate-500">{user.role}</span>
+          <span className="block text-xs text-slate-500">
+            {user ? roleLabel(user.role) : ""}
+          </span>
         </span>
         <DownOutlined
           className={[
