@@ -5,6 +5,7 @@ const ROUTES = {
   DASHBOARD: "/dashboard",
   PLAYERS: "/players",
   EVENT: "/event",
+  MARKS: "/marks",
   TEAM: "/team",
   RESULTS: "/results",
   NOTIFICATIONS: "/notifications",

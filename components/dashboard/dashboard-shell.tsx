@@ -6,6 +6,7 @@ import {
   BellOutlined,
   CalendarOutlined,
   DownOutlined,
+  EditOutlined,
   HomeOutlined,
   IdcardOutlined,
   LogoutOutlined,
@@ -47,6 +48,7 @@ const NAV: NavItem[] = [
   { label: "Home", href: ROUTES.DASHBOARD, icon: HomeOutlined, exact: true },
   { label: "Players", href: ROUTES.PLAYERS, icon: TrophyOutlined },
   { label: "Event", href: ROUTES.EVENT, icon: CalendarOutlined },
+  { label: "Add Marks", href: ROUTES.MARKS, icon: EditOutlined },
   { label: "Results", href: ROUTES.RESULTS, icon: BarChartOutlined },
   { label: "Notifications", href: ROUTES.NOTIFICATIONS, icon: BellOutlined },
 ];
