@@ -15,6 +15,7 @@ import {
   Space,
   Spin,
   Table,
+  Tabs,
   Tag,
   Tooltip,
   type TableProps,
@@ -167,22 +168,6 @@ export const MarksFeature = () => {
     <div className="mx-auto space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Add Marks</h1>
-
-        {availablePerformances.length > 1 ? (
-          <label className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-600">Performance</span>
-            <Select
-              className="w-56"
-              placeholder="Select performance"
-              value={performanceId ?? undefined}
-              onChange={setPerformanceOverride}
-              options={availablePerformances
-                .slice()
-                .sort((a, b) => a.order - b.order)
-                .map((p) => ({ label: p.name, value: p.id }))}
-            />
-          </label>
-        ) : null}
       </div>
 
       {isAdmin && !performancesQuery.isLoading && availablePerformances.length === 0 ? (
@@ -230,8 +215,20 @@ export const MarksFeature = () => {
           </>
         ) : (
           <>
+            {availablePerformances.length > 1 ? (
+              <Tabs
+                type="card"
+                activeKey={performanceId ?? undefined}
+                onChange={setPerformanceOverride}
+                items={availablePerformances
+                  .slice()
+                  .sort((a, b) => a.order - b.order)
+                  .map((p) => ({ key: p.id, label: p.name }))}
+              />
+            ) : null}
+
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button icon={<ArrowLeftOutlined />} onClick={() => setSelectedEventId(null)}>
                 Back to events
               </Button>

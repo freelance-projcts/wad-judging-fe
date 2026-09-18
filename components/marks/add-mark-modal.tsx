@@ -182,7 +182,7 @@ export const AddMarkModal = ({
                         key={key}
                         className="flex items-center gap-3 rounded-xl bg-blue-50 p-3"
                       >
-                        <span className="w-8 shrink-0 text-center font-bold text-blue-600">
+                        <span className="flex w-8 shrink-0 items-center justify-center self-stretch font-bold text-blue-600">
                           {label}
                         </span>
                         <Form.Item

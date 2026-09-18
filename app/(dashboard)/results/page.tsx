@@ -1,5 +1,5 @@
-import { ComingSoon } from "@/components/dashboard/coming-soon";
+import { ResultsFeature } from "@/components/results/results-feature";
 
-const ResultsPage = () => <ComingSoon title="Results" />;
+const ResultsPage = () => <ResultsFeature />;
 
 export default ResultsPage;
