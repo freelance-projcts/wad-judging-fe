@@ -4,6 +4,8 @@
 // proxies them to the backend so the browser sees a same-origin call and the
 // backend's http-only session cookie works without any CORS setup there.
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
+
 export class ApiError extends Error {
   status: number;
 
@@ -36,7 +38,7 @@ export async function apiFetch<T>(
   path: string,
   { body, query, headers, ...rest }: ApiRequestOptions = {},
 ): Promise<T> {
-  const response = await fetch(`/api${path}${buildQueryString(query)}`, {
+  const response = await fetch(`${API_BASE_URL}${path}${buildQueryString(query)}`, {
     ...rest,
     credentials: "include",
     headers: {
