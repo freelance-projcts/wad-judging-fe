@@ -6,11 +6,11 @@ import { Alert, Empty, Spin } from "antd";
 
 import { StatCard } from "@/components/dashboard/stat-card";
 import { PlayerCard } from "@/components/dashboard/player-card";
+import { EventCard } from "@/components/marks/event-card";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { getDashboardSummary } from "@/lib/api/dashboard";
 import { listStudents } from "@/lib/api/students";
 import { listEvents } from "@/lib/api/events";
-import { listEditRequests } from "@/lib/api/edit-requests";
 
 const RECENT_PLAYERS_PAGE_SIZE = 8;
 
@@ -37,12 +37,6 @@ const DashboardPage = () => {
     enabled: Boolean(profile) && !isAdmin,
   });
 
-  const editRequestsQuery = useQuery({
-    queryKey: ["edit-requests", "own"],
-    queryFn: listEditRequests,
-    enabled: Boolean(profile) && !isAdmin,
-  });
-
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long",
     year: "numeric",
@@ -58,39 +52,49 @@ const DashboardPage = () => {
     );
   }
 
-  const totalEvents = isAdmin
-    ? summaryQuery.data?.totalEvents
-    : eventsQuery.data?.length;
-
-  const pendingRequests = isAdmin
-    ? summaryQuery.data?.pendingRequests.total
-    : editRequestsQuery.data?.filter((r) => r.status === "PENDING").length;
-
-  const stats = [
-    {
-      label: "Total Players",
-      value: recentStudentsQuery.data?.total ?? 0,
-      icon: TeamOutlined,
-      color: "#1E40AF",
-      bg: "#E7ECFA",
-    },
-    {
-      label: "Total Events",
-      value: totalEvents ?? 0,
-      icon: CalendarOutlined,
-      color: "#3EA845",
-      bg: "#E8F5E9",
-    },
-    {
-      label: "Pending Requests",
-      value: pendingRequests ?? 0,
-      icon: BellOutlined,
-      color: "#EF7E1B",
-      bg: "#FDF0E2",
-    },
-  ];
+  const stats = isAdmin
+    ? [
+        {
+          label: "Total Players",
+          value: recentStudentsQuery.data?.total ?? 0,
+          icon: TeamOutlined,
+          color: "#1E40AF",
+          bg: "#E7ECFA",
+        },
+        {
+          label: "Total Events",
+          value: summaryQuery.data?.totalEvents ?? 0,
+          icon: CalendarOutlined,
+          color: "#3EA845",
+          bg: "#E8F5E9",
+        },
+        {
+          label: "Pending Requests",
+          value: summaryQuery.data?.pendingRequests.total ?? 0,
+          icon: BellOutlined,
+          color: "#EF7E1B",
+          bg: "#FDF0E2",
+        },
+      ]
+    : [
+        {
+          label: "Total Events",
+          value: eventsQuery.data?.length ?? 0,
+          icon: CalendarOutlined,
+          color: "#3EA845",
+          bg: "#E8F5E9",
+        },
+        {
+          label: "Total Students",
+          value: recentStudentsQuery.data?.total ?? 0,
+          icon: TeamOutlined,
+          color: "#1E40AF",
+          bg: "#E7ECFA",
+        },
+      ];
 
   const recentPlayers = recentStudentsQuery.data?.items ?? [];
+  const availableEvents = eventsQuery.data ?? [];
 
   return (
     <div className="mx-auto space-y-8">
@@ -103,38 +107,62 @@ const DashboardPage = () => {
         </p>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section
+        className={`grid gap-4 sm:grid-cols-2 ${isAdmin ? "lg:grid-cols-3" : ""}`}
+      >
         {stats.map((stat) => (
           <StatCard key={stat.label} {...stat} />
         ))}
       </section>
 
-      <section>
-        <h2 className="mb-4 text-lg font-semibold text-slate-800">
-          Recently Added Players
-        </h2>
+      {isAdmin ? (
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-slate-800">
+            Recently Added Players
+          </h2>
 
-        {recentStudentsQuery.isLoading ? (
-          <div className="flex justify-center py-10">
-            <Spin />
-          </div>
-        ) : recentStudentsQuery.isError ? (
-          <Alert type="error" showIcon message="Could not load recent players." />
-        ) : recentPlayers.length === 0 ? (
-          <Empty description="No players added yet" />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {recentPlayers.map((player, i) => (
-              <PlayerCard
-                key={player.id}
-                index={i}
-                name={player.fullName}
-                subtitle={player.code}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+          {recentStudentsQuery.isLoading ? (
+            <div className="flex justify-center py-10">
+              <Spin />
+            </div>
+          ) : recentStudentsQuery.isError ? (
+            <Alert type="error" showIcon message="Could not load recent players." />
+          ) : recentPlayers.length === 0 ? (
+            <Empty description="No players added yet" />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {recentPlayers.map((player, i) => (
+                <PlayerCard
+                  key={player.id}
+                  index={i}
+                  name={player.fullName}
+                  subtitle={player.code}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : (
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-slate-800">Available Events</h2>
+
+          {eventsQuery.isLoading ? (
+            <div className="flex justify-center py-10">
+              <Spin />
+            </div>
+          ) : eventsQuery.isError ? (
+            <Alert type="error" showIcon message="Could not load events." />
+          ) : availableEvents.length === 0 ? (
+            <Empty description="No events yet" />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {availableEvents.map((event) => (
+                <EventCard key={event.id} name={event.name} gender={event.gender} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 };

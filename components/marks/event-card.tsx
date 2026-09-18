@@ -16,18 +16,15 @@ const GENDER_TINT: Record<Gender, (typeof TINTS)[number]> = {
 type EventCardProps = {
   name: string;
   gender: Gender;
-  onClick: () => void;
+  /** Omit for a plain display tile (e.g. a dashboard summary) instead of a selector. */
+  onClick?: () => void;
 };
 
 export const EventCard = ({ name, gender, onClick }: EventCardProps) => {
   const tint = GENDER_TINT[gender];
 
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-md"
-    >
+  const content = (
+    <>
       <span
         className="grid h-12 w-12 place-items-center rounded-xl transition-transform group-hover:scale-110"
         style={{ backgroundColor: tint.bg }}
@@ -40,6 +37,24 @@ export const EventCard = ({ name, gender, onClick }: EventCardProps) => {
           {genderLabel(gender)}
         </p>
       </div>
+    </>
+  );
+
+  if (!onClick) {
+    return (
+      <div className="group flex flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-md"
+    >
+      {content}
     </button>
   );
 };

@@ -42,15 +42,16 @@ type NavItem = {
   href: string;
   icon: ComponentType;
   exact?: boolean;
+  adminOnly?: boolean;
 };
 
 const NAV: NavItem[] = [
   { label: "Home", href: ROUTES.DASHBOARD, icon: HomeOutlined, exact: true },
-  { label: "Players", href: ROUTES.PLAYERS, icon: TrophyOutlined },
-  { label: "Event", href: ROUTES.EVENT, icon: CalendarOutlined },
+  { label: "Players", href: ROUTES.PLAYERS, icon: TrophyOutlined, adminOnly: true },
+  { label: "Event", href: ROUTES.EVENT, icon: CalendarOutlined, adminOnly: true },
   { label: "Add Marks", href: ROUTES.MARKS, icon: EditOutlined },
-  { label: "Results", href: ROUTES.RESULTS, icon: BarChartOutlined },
-  { label: "Notifications", href: ROUTES.NOTIFICATIONS, icon: BellOutlined },
+  { label: "Results", href: ROUTES.RESULTS, icon: BarChartOutlined, adminOnly: true },
+  { label: "Notifications", href: ROUTES.NOTIFICATIONS, icon: BellOutlined, adminOnly: true },
 ];
 
 const isActive = (pathname: string, item: Pick<NavItem, "href" | "exact">) =>
@@ -83,6 +84,9 @@ type SidebarProps = { onNavigate?: () => void };
 
 const Sidebar = ({ onNavigate }: SidebarProps) => {
   const pathname = usePathname();
+  const { data: profile } = useCurrentUser();
+  const isAdmin = profile?.user.role === "ADMIN";
+  const items = NAV.filter((item) => isAdmin || !item.adminOnly);
 
   const linkClass = (active: boolean, bright = false) =>
     [
@@ -129,7 +133,7 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-        {NAV.map(({ label, href, icon: Icon, exact }) => (
+        {items.map(({ label, href, icon: Icon, exact }) => (
           <Link
             key={href}
             href={href}
