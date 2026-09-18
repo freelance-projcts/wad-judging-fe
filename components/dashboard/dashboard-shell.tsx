@@ -27,6 +27,7 @@ import {
 } from "react";
 
 import ROUTES from "@/constants/routes";
+import { canAccessRoute } from "@/constants/route-access";
 import {
   BRAND_GRADIENT,
   NAV_ITEMS,
@@ -42,16 +43,15 @@ type NavItem = {
   href: string;
   icon: ComponentType;
   exact?: boolean;
-  adminOnly?: boolean;
 };
 
 const NAV: NavItem[] = [
   { label: "Home", href: ROUTES.DASHBOARD, icon: HomeOutlined, exact: true },
-  { label: "Players", href: ROUTES.PLAYERS, icon: TrophyOutlined, adminOnly: true },
-  { label: "Event", href: ROUTES.EVENT, icon: CalendarOutlined, adminOnly: true },
+  { label: "Players", href: ROUTES.PLAYERS, icon: TrophyOutlined },
+  { label: "Event", href: ROUTES.EVENT, icon: CalendarOutlined },
   { label: "Add Marks", href: ROUTES.MARKS, icon: EditOutlined },
-  { label: "Results", href: ROUTES.RESULTS, icon: BarChartOutlined, adminOnly: true },
-  { label: "Notifications", href: ROUTES.NOTIFICATIONS, icon: BellOutlined, adminOnly: true },
+  { label: "Results", href: ROUTES.RESULTS, icon: BarChartOutlined },
+  { label: "Notifications", href: ROUTES.NOTIFICATIONS, icon: BellOutlined },
 ];
 
 const isActive = (pathname: string, item: Pick<NavItem, "href" | "exact">) =>
@@ -86,7 +86,7 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
   const pathname = usePathname();
   const { data: profile } = useCurrentUser();
   const isAdmin = profile?.user.role === "ADMIN";
-  const items = NAV.filter((item) => isAdmin || !item.adminOnly);
+  const items = NAV.filter((item) => canAccessRoute(item.href, isAdmin));
 
   const linkClass = (active: boolean, bright = false) =>
     [
