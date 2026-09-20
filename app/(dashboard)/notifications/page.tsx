@@ -1,5 +1,5 @@
-import { ComingSoon } from "@/components/dashboard/coming-soon";
+import { NotificationsFeature } from "@/components/notifications/notifications-feature";
 
-const NotificationsPage = () => <ComingSoon title="Notifications" />;
+const NotificationsPage = () => <NotificationsFeature />;
 
 export default NotificationsPage;

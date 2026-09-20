@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { listMarks, submitMarks } from "@/lib/api/marks";
+import { listEditRequests } from "@/lib/api/edit-requests";
 import { ApiError } from "@/lib/api/client";
 import { TINTS } from "@/constants/brand";
 import {
@@ -60,6 +61,25 @@ export const AddMarkModal = ({
     (marksQuery.data ?? []).map((entry) => [entry.round, entry]),
   );
 
+  // A judge can only resubmit an already-recorded round once an admin has
+  // approved their edit request for that exact mark entry - fetched fresh
+  // whenever the modal opens so a just-approved request is picked up.
+  // GET /edit-requests already scopes non-admins to their own requests.
+  const editRequestsQuery = useQuery({
+    queryKey: ["edit-requests"],
+    queryFn: listEditRequests,
+    enabled: open && !canEditSubmitted,
+  });
+  const approvedMarkEntryIds = new Set(
+    (editRequestsQuery.data ?? [])
+      .filter((r) => r.status === "APPROVED")
+      .map((r) => r.markEntryId),
+  );
+  const isRoundEditable = (round: number) => {
+    const entry = existingByRound.get(round);
+    return canEditSubmitted || !entry || approvedMarkEntryIds.has(entry.id);
+  };
+
   // Jump back to Round 1 whenever a fresh fetch for this student/event lands
   // (i.e. a different row was opened) — adjusted during render, not an effect.
   const [lastDataAt, setLastDataAt] = useState<number | null>(null);
@@ -91,6 +111,9 @@ export const AddMarkModal = ({
       queryClient.invalidateQueries({
         queryKey: ["marks", performanceId, event?.id, student?.id],
       });
+      // A used approval is deleted server-side (consumed) - refetch so this
+      // round shows locked again instead of staying editable from stale data.
+      queryClient.invalidateQueries({ queryKey: ["edit-requests"] });
       message.success("Marks saved.");
       onClose();
     },
@@ -109,9 +132,7 @@ export const AddMarkModal = ({
 
   const handleFinish = (values: FormValues) => {
     const editableRounds = rounds.filter(
-      (round) =>
-        (canEditSubmitted || !existingByRound.has(round)) &&
-        isRoundTouched(values[roundKey(round)]),
+      (round) => isRoundEditable(round) && isRoundTouched(values[roundKey(round)]),
     );
     if (editableRounds.length === 0) {
       message.warning("Enter marks for at least one round before saving.");
@@ -125,6 +146,22 @@ export const AddMarkModal = ({
         roundFormToInput(round, values[roundKey(round)] ?? {}),
       ),
     });
+  };
+
+  // Every round's fields live in one Form, so a validation error on a round
+  // the user isn't currently looking at would otherwise fail silently -
+  // jump to it and say so instead of leaving "Save marks" appear to do nothing.
+  const handleFinishFailed: ({
+    errorFields,
+  }: {
+    errorFields: { name: (string | number)[] }[];
+  }) => void = ({ errorFields }) => {
+    const firstErrorRound = errorFields[0]?.name[0];
+    if (typeof firstErrorRound === "string" && firstErrorRound !== roundKey(Number(activeRound))) {
+      const round = rounds.find((r) => roundKey(r) === firstErrorRound);
+      if (round !== undefined) setActiveRound(String(round));
+    }
+    message.error("Please fix the highlighted fields before saving.");
   };
 
   return (
@@ -159,12 +196,21 @@ export const AddMarkModal = ({
           }
         />
       ) : (
-        <Form form={form} layout="vertical" requiredMark={false} onFinish={handleFinish}>
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={false}
+          onFinish={handleFinish}
+          onFinishFailed={handleFinishFailed}
+        >
           <Tabs
             activeKey={activeRound}
             onChange={setActiveRound}
             items={rounds.map((round) => {
-              const locked = !canEditSubmitted && existingByRound.has(round);
+              const entry = existingByRound.get(round);
+              const locked = !isRoundEditable(round);
+              const unlockedByApproval =
+                !canEditSubmitted && Boolean(entry) && approvedMarkEntryIds.has(entry!.id);
               return {
                 key: String(round),
                 label: `Round ${round}`,
@@ -176,6 +222,12 @@ export const AddMarkModal = ({
                         type="warning"
                         showIcon
                         message="Already submitted — use Send Edit Request to change this round."
+                      />
+                    ) : unlockedByApproval ? (
+                      <Alert
+                        type="info"
+                        showIcon
+                        message="Edit request approved — update the scores and save."
                       />
                     ) : null}
 
@@ -200,7 +252,13 @@ export const AddMarkModal = ({
                             rules={[
                               () => ({
                                 validator(_, value) {
-                                  if (!isRoundTouched(form.getFieldValue(roundKey(round)))) {
+                                  // A locked round's fields are prefilled from a
+                                  // pre-existing entry the user can't edit here -
+                                  // never block the form on data outside their
+                                  // control (see: a locked round always looks
+                                  // "touched" from its real scores, but its
+                                  // supervisor was never stored by the backend).
+                                  if (locked || !isRoundTouched(form.getFieldValue(roundKey(round)))) {
                                     return Promise.resolve();
                                   }
                                   return value === null || value === undefined
@@ -229,7 +287,7 @@ export const AddMarkModal = ({
                             rules={[
                               () => ({
                                 validator(_, value) {
-                                  if (!isRoundTouched(form.getFieldValue(roundKey(round)))) {
+                                  if (locked || !isRoundTouched(form.getFieldValue(roundKey(round)))) {
                                     return Promise.resolve();
                                   }
                                   return !value || !String(value).trim()
