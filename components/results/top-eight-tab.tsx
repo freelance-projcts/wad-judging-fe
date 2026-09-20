@@ -6,52 +6,82 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { listEvents } from "@/lib/api/events";
-import { listStudents } from "@/lib/api/students";
+import { getTopEightResults, type TopEightStudentRow } from "@/lib/api/results";
 import { ApiError } from "@/lib/api/client";
 import { downloadCsv } from "@/lib/csv";
-import { provinceLabel, teamLabel } from "@/lib/domain";
-import type { Student } from "@/lib/api/students";
+import { PROVINCE_OPTIONS, teamLabel, type Province } from "@/lib/domain";
+import { toOverallTopEightRanking, type OverallRankedRow } from "@/lib/results-ranking";
 
-const columns: TableProps<Student>["columns"] = [
+type FlatRow = OverallRankedRow<TopEightStudentRow>;
+
+const columns: TableProps<FlatRow>["columns"] = [
+  {
+    title: "Rank",
+    dataIndex: "overallRank",
+    key: "overallRank",
+    width: 72,
+    render: (rank: number, row) => (
+      <span className={row.isTopEight ? "font-bold text-amber-700" : undefined}>{rank}</span>
+    ),
+  },
   { title: "Id", dataIndex: "code", key: "code" },
   { title: "Name", dataIndex: "fullName", key: "fullName" },
+  { title: "Province", dataIndex: "provinceLabel", key: "provinceLabel" },
   {
     title: "Team",
     dataIndex: "team",
     key: "team",
-    render: (team: Student["team"]) => (
-      <Tag color={team ? "blue" : "default"}>{teamLabel(team)}</Tag>
-    ),
+    render: (team: FlatRow["team"]) => <Tag color={team ? "blue" : "default"}>{teamLabel(team)}</Tag>,
   },
   {
-    title: "Province",
-    dataIndex: "province",
-    key: "province",
-    render: (province: Student["province"]) => provinceLabel(province),
+    title: "Score",
+    dataIndex: "finalScore",
+    key: "finalScore",
+    align: "center",
+    render: (score: number, row) => (
+      <span className={row.isTopEight ? "font-bold text-amber-700" : undefined}>{score.toFixed(2)}</span>
+    ),
   },
 ];
 
 export const TopEightTab = () => {
   const [eventId, setEventId] = useState<string | null>(null);
+  const [province, setProvince] = useState<Province | null>(null);
 
   const eventsQuery = useQuery({ queryKey: ["events"], queryFn: () => listEvents() });
-  const selectedEvent = eventsQuery.data?.find((e) => e.id === eventId) ?? null;
 
-  const studentsQuery = useQuery({
+  const resultsQuery = useQuery({
     queryKey: ["results", "top-8", eventId],
-    queryFn: () => listStudents({ gender: selectedEvent?.gender, pageSize: 1000 }),
-    enabled: Boolean(selectedEvent),
+    queryFn: () => getTopEightResults(eventId!),
+    enabled: Boolean(eventId),
   });
 
-  const students = studentsQuery.data?.items ?? [];
-  const canExport = Boolean(selectedEvent) && students.length > 0;
+  const allProvinces = resultsQuery.data?.provinces ?? [];
+  // "Top 8" is a ranking across every province - always compute it from the
+  // full, unfiltered set so a row's rank/highlight never shifts depending on
+  // the province filter. The filter only narrows which rows are *shown*; once
+  // it's applied there's no single-province "top 8" to highlight, so the
+  // highlight is suppressed rather than recomputed for the subset.
+  const rankedAll = toOverallTopEightRanking(allProvinces);
+  const rows = province
+    ? rankedAll.filter((r) => r.province === province).map((r) => ({ ...r, isTopEight: false }))
+    : rankedAll;
+  const canExport = rows.length > 0;
 
   const handleExport = () => {
-    if (!selectedEvent) return;
+    if (!resultsQuery.data) return;
     downloadCsv(
-      `top-8-${selectedEvent.name}.csv`,
-      ["Id", "Name", "Team", "Province"],
-      students.map((s) => [s.code, s.fullName, teamLabel(s.team), provinceLabel(s.province)]),
+      `top-8-${resultsQuery.data.eventName}.csv`,
+      ["Rank", "Id", "Name", "Province", "Team", "Score", "Top 8"],
+      rows.map((r) => [
+        r.overallRank,
+        r.code,
+        r.fullName,
+        r.provinceLabel,
+        teamLabel(r.team),
+        r.finalScore.toFixed(2),
+        r.isTopEight ? "Yes" : "No",
+      ]),
     );
   };
 
@@ -65,8 +95,25 @@ export const TopEightTab = () => {
             placeholder="Select event"
             loading={eventsQuery.isLoading}
             value={eventId ?? undefined}
-            onChange={setEventId}
+            onChange={(value) => {
+              setEventId(value);
+              setProvince(null);
+            }}
             options={(eventsQuery.data ?? []).map((e) => ({ label: e.name, value: e.id }))}
+          />
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-600">Province (optional)</span>
+          <Select
+            allowClear
+            className="w-53"
+            placeholder="All provinces"
+            disabled={!eventId}
+            showSearch={{ optionFilterProp: "label" }}
+            value={province ?? undefined}
+            onChange={(value) => setProvince(value ?? null)}
+            options={PROVINCE_OPTIONS}
           />
         </label>
 
@@ -80,29 +127,36 @@ export const TopEightTab = () => {
         </Button>
       </div>
 
-      {!selectedEvent ? (
+      {!eventId ? (
         <Empty description="Select an event to load results" />
-      ) : studentsQuery.isError ? (
+      ) : resultsQuery.isError ? (
         <Alert
           type="error"
           showIcon
-          message="Could not load players."
+          message="Could not load results."
           description={
-            studentsQuery.error instanceof ApiError ? studentsQuery.error.message : undefined
+            resultsQuery.error instanceof ApiError ? resultsQuery.error.message : undefined
           }
         />
-      ) : studentsQuery.isLoading ? (
+      ) : resultsQuery.isLoading ? (
         <div className="flex justify-center py-10">
           <Spin />
         </div>
+      ) : rows.length === 0 ? (
+        <Empty
+          description={
+            province ? "No marks recorded for this province yet" : "No marks recorded for this event yet"
+          }
+        />
       ) : (
-        <Table<Student>
+        <Table<FlatRow>
           columns={columns}
-          dataSource={students}
-          rowKey="id"
+          dataSource={rows}
+          rowKey="studentId"
           size="small"
           pagination={false}
           scroll={{ x: "max-content" }}
+          rowClassName={(row) => (row.isTopEight ? "bg-amber-50" : "")}
         />
       )}
     </div>

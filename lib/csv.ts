@@ -9,8 +9,8 @@ const escapeCsvCell = (value: unknown): string => {
 export const toCsv = (headers: string[], rows: unknown[][]): string =>
   [headers, ...rows].map((row) => row.map(escapeCsvCell).join(",")).join("\n");
 
-export const downloadCsv = (filename: string, headers: string[], rows: unknown[][]) => {
-  const blob = new Blob([toCsv(headers, rows)], { type: "text/csv;charset=utf-8;" });
+const downloadBlob = (filename: string, content: string) => {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -18,3 +18,18 @@ export const downloadCsv = (filename: string, headers: string[], rows: unknown[]
   link.click();
   URL.revokeObjectURL(url);
 };
+
+export const downloadCsv = (filename: string, headers: string[], rows: unknown[][]) =>
+  downloadBlob(filename, toCsv(headers, rows));
+
+/** One CSV file made of several distinct tables, each with its own title + header row, separated by a blank line. */
+export const downloadCsvSections = (
+  filename: string,
+  sections: { title?: string; headers: string[]; rows: unknown[][] }[],
+) =>
+  downloadBlob(
+    filename,
+    sections
+      .map((section) => (section.title ? `${section.title}\n${toCsv(section.headers, section.rows)}` : toCsv(section.headers, section.rows)))
+      .join("\n\n"),
+  );

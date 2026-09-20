@@ -10,7 +10,7 @@ const ACCESS: [route: string, access: RouteAccess][] = [
   [ROUTES.EVENT, "admin"],
   [ROUTES.MARKS, "judge"],
   [ROUTES.TEAM, "admin"],
-  [ROUTES.RESULTS, "admin"],
+  [ROUTES.RESULTS, "all"],
   [ROUTES.NOTIFICATIONS, "admin"],
   [ROUTES.PROFILE, "all"],
 ];

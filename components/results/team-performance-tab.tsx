@@ -6,22 +6,25 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { listEvents } from "@/lib/api/events";
-import { listStudents } from "@/lib/api/students";
+import {
+  getTeamPerformanceResults,
+  type TeamPerformanceProvinceGroup,
+  type TeamPerformanceStudentRow,
+} from "@/lib/api/results";
 import { ApiError } from "@/lib/api/client";
-import { downloadCsv } from "@/lib/csv";
-import { PROVINCE_OPTIONS, provinceLabel, type Province } from "@/lib/domain";
-import type { Student } from "@/lib/api/students";
-import type { Team } from "@/lib/domain";
+import { downloadCsvSections } from "@/lib/csv";
+import { PROVINCE_OPTIONS, type Province } from "@/lib/domain";
 
-const MARKS_PLACEHOLDER = "—";
-
-const columns: TableProps<Student>["columns"] = [
+const columns: TableProps<TeamPerformanceStudentRow>["columns"] = [
+  { title: "Rank", dataIndex: "rank", key: "rank", width: 64 },
   { title: "Id", dataIndex: "code", key: "code" },
   { title: "Name", dataIndex: "fullName", key: "fullName" },
   {
-    title: "Marks",
-    key: "marks",
-    render: () => MARKS_PLACEHOLDER,
+    title: "Score",
+    dataIndex: "finalScore",
+    key: "finalScore",
+    align: "center",
+    render: (score: number) => score.toFixed(2),
   },
 ];
 
@@ -32,30 +35,55 @@ export const TeamPerformanceTab = () => {
   const eventsQuery = useQuery({ queryKey: ["events"], queryFn: () => listEvents() });
   const selectedEvent = eventsQuery.data?.find((e) => e.id === eventId) ?? null;
 
-  const studentsQuery = useQuery({
-    queryKey: ["results", "team-performance", eventId, province],
-    queryFn: () =>
-      listStudents({
-        gender: selectedEvent?.gender,
-        province: province!,
-        pageSize: 1000,
-      }),
-    enabled: Boolean(selectedEvent) && Boolean(province),
+  const resultsQuery = useQuery({
+    queryKey: ["results", "team-performance", eventId],
+    queryFn: () => getTeamPerformanceResults(eventId!),
+    enabled: Boolean(eventId),
   });
 
-  const students = studentsQuery.data?.items ?? [];
-  const byTeam = (team: Team) => students.filter((s) => s.team === team);
-  const canExport = Boolean(selectedEvent) && Boolean(province) && students.length > 0;
+  const allGroups = resultsQuery.data?.provinces ?? [];
+  // Province is optional: with one picked, show just that province; otherwise show every province.
+  const groups = province ? allGroups.filter((p) => p.province === province) : allGroups;
+
+  // Only the top 5 (already ranked top-to-bottom, highest score first) count
+  // toward the team total - the rest are excluded from this view entirely.
+  const top5For = (group: TeamPerformanceProvinceGroup, team: "A" | "B") =>
+    (group.teams.find((t) => t.team === team)?.students ?? [])
+      .filter((s) => s.countedTowardTotal)
+      .slice(0, 5);
+  const totalFor = (group: TeamPerformanceProvinceGroup, team: "A" | "B") =>
+    group.teams.find((t) => t.team === team)?.teamTotal ?? 0;
+
+  const canExport = groups.length > 0;
 
   const handleExport = () => {
-    if (!selectedEvent || !province) return;
-    downloadCsv(
-      `team-performance-${selectedEvent.name}-${provinceLabel(province)}.csv`,
-      ["Team", "Id", "Name", "Marks"],
-      (["A", "B"] as Team[]).flatMap((team) =>
-        byTeam(team).map((s) => [`Team ${team}`, s.code, s.fullName, MARKS_PLACEHOLDER]),
-      ),
-    );
+    if (!selectedEvent || groups.length === 0) return;
+    const suffix = province ? `-${groups[0].provinceLabel}` : "";
+    downloadCsvSections(`team-performance-${selectedEvent.name}${suffix}.csv`, [
+      {
+        title: "Team Performance",
+        headers: ["Province", "Team", "Rank", "Id", "Name", "Score"],
+        rows: groups.flatMap((group) =>
+          (["A", "B"] as const).flatMap((team) =>
+            top5For(group, team).map((s) => [
+              group.provinceLabel,
+              `Team ${team}`,
+              s.rank,
+              s.code,
+              s.fullName,
+              s.finalScore.toFixed(2),
+            ]),
+          ),
+        ),
+      },
+      {
+        title: "Team Totals",
+        headers: ["Province", "Team", "Total"],
+        rows: groups.flatMap((group) =>
+          (["A", "B"] as const).map((team) => [group.provinceLabel, `Team ${team}`, totalFor(group, team).toFixed(2)]),
+        ),
+      },
+    ]);
   };
 
   return (
@@ -77,14 +105,15 @@ export const TeamPerformanceTab = () => {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-600">Province</span>
+          <span className="text-xs font-medium text-slate-600">Province (optional)</span>
           <Select
+            allowClear
             className="w-53"
-            placeholder="Select province"
-            disabled={!selectedEvent}
+            placeholder="All provinces"
+            disabled={!eventId}
             showSearch={{ optionFilterProp: "label" }}
             value={province ?? undefined}
-            onChange={setProvince}
+            onChange={(value) => setProvince(value ?? null)}
             options={PROVINCE_OPTIONS}
           />
         </label>
@@ -99,45 +128,61 @@ export const TeamPerformanceTab = () => {
         </Button>
       </div>
 
-      {!selectedEvent || !province ? (
-        <Empty description="Select an event and a province to load results" />
-      ) : studentsQuery.isError ? (
+      {!eventId ? (
+        <Empty description="Select an event to load results" />
+      ) : resultsQuery.isError ? (
         <Alert
           type="error"
           showIcon
-          message="Could not load players."
+          message="Could not load results."
           description={
-            studentsQuery.error instanceof ApiError ? studentsQuery.error.message : undefined
+            resultsQuery.error instanceof ApiError ? resultsQuery.error.message : undefined
           }
         />
-      ) : studentsQuery.isLoading ? (
+      ) : resultsQuery.isLoading ? (
         <div className="flex justify-center py-10">
           <Spin />
         </div>
+      ) : groups.length === 0 ? (
+        <Empty
+          description={
+            province ? "No marks recorded for this province yet" : "No marks recorded for this event yet"
+          }
+        />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">Team A</h3>
-            <Table<Student>
-              columns={columns}
-              dataSource={byTeam("A")}
-              rowKey="id"
-              size="small"
-              pagination={false}
-              scroll={{ x: "max-content" }}
-            />
-          </div>
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">Team B</h3>
-            <Table<Student>
-              columns={columns}
-              dataSource={byTeam("B")}
-              rowKey="id"
-              size="small"
-              pagination={false}
-              scroll={{ x: "max-content" }}
-            />
-          </div>
+        <div className="space-y-6">
+          {groups.map((group) => (
+            <div key={group.province} className="overflow-hidden rounded-xl border border-slate-200">
+              {!province ? (
+                <div className="border-b border-slate-200 bg-slate-100 px-4 py-2">
+                  <h3 className="text-sm font-semibold text-slate-800">{group.provinceLabel}</h3>
+                </div>
+              ) : null}
+              <div className="grid gap-4 p-4 lg:grid-cols-2">
+                {(["A", "B"] as const).map((team) => (
+                  <div key={team}>
+                    <h4 className="mb-2 text-sm font-semibold text-slate-700">
+                      Team {team} — Top 5
+                    </h4>
+                    <Table<TeamPerformanceStudentRow>
+                      columns={columns}
+                      dataSource={top5For(group, team)}
+                      rowKey="studentId"
+                      size="small"
+                      pagination={false}
+                      scroll={{ x: "max-content" }}
+                    />
+                    <div className="mt-2 flex items-center justify-between rounded-lg border-2 border-blue-200 bg-blue-50 px-4 py-2">
+                      <span className="text-sm font-semibold text-blue-900">Team Total</span>
+                      <span className="text-xl font-bold text-blue-700">
+                        {totalFor(group, team).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -39,6 +39,8 @@ import {
 import { listEvents } from "@/lib/api/events";
 import { listStudents } from "@/lib/api/students";
 import { listPerformances } from "@/lib/api/performances";
+import { getTopEightResults } from "@/lib/api/results";
+import { toOverallTopEightRanking } from "@/lib/results-ranking";
 import { ApiError } from "@/lib/api/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 
@@ -61,6 +63,11 @@ export const MarksFeature = () => {
   // available performance until the user (if there's more than one) picks one.
   const [performanceOverride, setPerformanceOverride] = useState<string | null>(null);
   const performanceId = performanceOverride ?? availablePerformances[0]?.id ?? null;
+  const activePerformance = availablePerformances.find((p) => p.id === performanceId) ?? null;
+  // Performance 2 only ever works with Performance 1's qualifiers for the same
+  // event - so the roster shown here is filtered down to Performance 1's
+  // overall top 8 (ties included) instead of every registered student.
+  const isPerformanceTwo = activePerformance?.name === "Performance 2";
 
   const eventsQuery = useQuery({ queryKey: ["events"], queryFn: () => listEvents() });
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -84,18 +91,37 @@ export const MarksFeature = () => {
   const [markStudent, setMarkStudent] = useState<Student | null>(null);
   const [editRequestStudent, setEditRequestStudent] = useState<Student | null>(null);
 
+  // Performance 2's roster is filtered client-side to a small qualifier set,
+  // so it fetches every matching student up front instead of a server page.
   const studentsQuery = useQuery({
-    queryKey: ["students", { page, pageSize, gender: filters.gender, province: filters.province }],
+    queryKey: [
+      "students",
+      { page, pageSize, gender: filters.gender, province: filters.province, isPerformanceTwo },
+    ],
     queryFn: () =>
-      listStudents({
-        page,
-        pageSize,
-        gender: filters.gender,
-        province: filters.province,
-      }),
+      listStudents(
+        isPerformanceTwo
+          ? { pageSize: 1000, gender: filters.gender, province: filters.province }
+          : { page, pageSize, gender: filters.gender, province: filters.province },
+      ),
     enabled: Boolean(selectedEvent),
     placeholderData: (previous) => previous,
   });
+
+  // Performance 1's overall top 8 (+ ties) for this event, used to gate who's
+  // shown when Performance 2 is selected. Only fetched when it's actually needed.
+  const topEightQuery = useQuery({
+    queryKey: ["results", "top-8", selectedEvent?.id],
+    queryFn: () => getTopEightResults(selectedEvent!.id),
+    enabled: Boolean(selectedEvent) && isPerformanceTwo,
+  });
+  const qualifiedStudentIds = isPerformanceTwo
+    ? new Set(
+        toOverallTopEightRanking(topEightQuery.data?.provinces ?? [])
+          .filter((r) => r.isTopEight)
+          .map((r) => r.studentId),
+      )
+    : null;
 
   const updateFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => {
     setFilters((f) => ({ ...f, [key]: value }));
@@ -161,8 +187,11 @@ export const MarksFeature = () => {
     },
   ];
 
-  const students = studentsQuery.data?.items ?? [];
-  const total = studentsQuery.data?.total ?? 0;
+  const allFetchedStudents = studentsQuery.data?.items ?? [];
+  const students = qualifiedStudentIds
+    ? allFetchedStudents.filter((s) => qualifiedStudentIds.has(s.id))
+    : allFetchedStudents;
+  const total = qualifiedStudentIds ? students.length : (studentsQuery.data?.total ?? 0);
 
   return (
     <div className="mx-auto space-y-4">
@@ -294,6 +323,12 @@ export const MarksFeature = () => {
 
             {/* Table */}
             <div className="mt-5">
+              {isPerformanceTwo ? (
+                <p className="mb-3 text-xs text-slate-500">
+                  Showing only Performance 1&apos;s overall top 8 (ties included) for this event.
+                </p>
+              ) : null}
+
               {studentsQuery.isError ? (
                 <Alert
                   type="error"
@@ -305,6 +340,23 @@ export const MarksFeature = () => {
                       : undefined
                   }
                 />
+              ) : isPerformanceTwo && topEightQuery.isError ? (
+                <Alert
+                  type="error"
+                  showIcon
+                  message="Could not load Performance 1's top 8 for this event."
+                  description={
+                    topEightQuery.error instanceof ApiError
+                      ? topEightQuery.error.message
+                      : undefined
+                  }
+                />
+              ) : isPerformanceTwo && topEightQuery.isLoading ? (
+                <div className="flex justify-center py-10">
+                  <Spin />
+                </div>
+              ) : isPerformanceTwo && students.length === 0 ? (
+                <Empty description="No Performance 1 top-8 results yet for this event." />
               ) : (
                 <Table<Student>
                   columns={columns}
@@ -312,17 +364,21 @@ export const MarksFeature = () => {
                   rowKey="id"
                   loading={studentsQuery.isFetching}
                   scroll={{ x: "max-content" }}
-                  pagination={{
-                    current: page,
-                    pageSize,
-                    total,
-                    showSizeChanger: true,
-                    onChange: (nextPage, nextPageSize) => {
-                      setPage(nextPage);
-                      setPageSize(nextPageSize);
-                    },
-                    showTotal: (t, range) => `Showing ${range[0]}–${range[1]} of ${t} players`,
-                  }}
+                  pagination={
+                    isPerformanceTwo
+                      ? false
+                      : {
+                          current: page,
+                          pageSize,
+                          total,
+                          showSizeChanger: true,
+                          onChange: (nextPage, nextPageSize) => {
+                            setPage(nextPage);
+                            setPageSize(nextPageSize);
+                          },
+                          showTotal: (t, range) => `Showing ${range[0]}–${range[1]} of ${t} players`,
+                        }
+                  }
                 />
               )}
             </div>

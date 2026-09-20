@@ -1,69 +1,89 @@
 "use client";
 
 import { DownloadOutlined, FilterOutlined, UpOutlined } from "@ant-design/icons";
-import { Alert, Button, Input, Spin, Table, type TableProps } from "antd";
+import { Alert, Button, Input, Select, Spin, Table, type TableProps } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { listEvents, type WadEvent } from "@/lib/api/events";
-import { listStudents, type Student } from "@/lib/api/students";
+import { getAllRounderResults, type AllRounderStudentRow } from "@/lib/api/results";
 import { ApiError } from "@/lib/api/client";
 import { downloadCsv } from "@/lib/csv";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
+import { GENDER_OPTIONS, PROVINCE_OPTIONS, TEAM_OPTIONS } from "@/lib/domain";
+import type { Gender, Province, Team } from "@/lib/domain";
 
 const MARKS_PLACEHOLDER = "—";
 
-type Filters = { id?: string; name?: string };
+type Filters = { id?: string; name?: string; gender?: Gender; province?: Province; team?: Team };
 
 export const AllRoundsTab = () => {
   const [filters, setFilters] = useState<Filters>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // The backend only exposes a single `search` term matched against both
-  // name and id, so when both filters are filled in, the Id one wins.
   const search = useDebouncedValue(filters.id || filters.name || "", 350);
 
-  const eventsQuery = useQuery({ queryKey: ["events"], queryFn: () => listEvents() });
-  const events = eventsQuery.data ?? [];
-
-  const studentsQuery = useQuery({
-    queryKey: ["results", "all-rounds", search],
-    queryFn: () => listStudents({ search: search || undefined, pageSize: 1000 }),
+  const resultsQuery = useQuery({
+    queryKey: ["results", "all-rounds", filters.gender, filters.province, filters.team],
+    queryFn: () =>
+      getAllRounderResults({
+        gender: filters.gender,
+        province: filters.province,
+        team: filters.team,
+      }),
   });
 
-  const students = studentsQuery.data?.items ?? [];
+  const events = resultsQuery.data?.events ?? [];
+  const allStudents = resultsQuery.data?.students ?? [];
+  const students = search
+    ? allStudents.filter(
+        (s) =>
+          s.code.toLowerCase().includes(search.toLowerCase()) ||
+          s.fullName.toLowerCase().includes(search.toLowerCase()),
+      )
+    : allStudents;
 
   const updateFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => {
     setFilters((f) => ({ ...f, [key]: value }));
   };
 
-  const columns: TableProps<Student>["columns"] = [
+  const columns: TableProps<AllRounderStudentRow>["columns"] = [
+    { title: "Rank", dataIndex: "rank", key: "rank", fixed: "left", width: 64 },
     { title: "Id", dataIndex: "code", key: "code", fixed: "left" },
     { title: "Player Name", dataIndex: "fullName", key: "fullName", fixed: "left" },
-    ...events.map((event: WadEvent) => ({
+    ...events.map((event) => ({
       title: event.name,
       key: event.id,
       align: "center" as const,
-      render: () => MARKS_PLACEHOLDER,
+      render: (_: unknown, student: AllRounderStudentRow) => {
+        const breakdown = student.events.find((e) => e.eventId === event.id);
+        return breakdown?.hasMark ? breakdown.finalScore!.toFixed(2) : MARKS_PLACEHOLDER;
+      },
     })),
     {
       title: "Total",
       key: "total",
       align: "center" as const,
       fixed: "right" as const,
-      render: () => MARKS_PLACEHOLDER,
+      className: "bg-blue-50",
+      render: (_: unknown, student: AllRounderStudentRow) => (
+        <span className="font-bold text-blue-700">{student.totalScore.toFixed(2)}</span>
+      ),
     },
   ];
 
   const handleExport = () => {
     downloadCsv(
-      "all-rounds.csv",
-      ["Id", "Player Name", ...events.map((e) => e.name), "Total"],
+      "all-rounders.csv",
+      ["Rank", "Id", "Player Name", ...events.map((e) => e.name), "Total"],
       students.map((s) => [
+        s.rank,
         s.code,
         s.fullName,
-        ...events.map(() => MARKS_PLACEHOLDER),
-        MARKS_PLACEHOLDER,
+        ...events.map((event) => {
+          const breakdown = s.events.find((e) => e.eventId === event.id);
+          return breakdown?.hasMark ? breakdown.finalScore!.toFixed(2) : MARKS_PLACEHOLDER;
+        }),
+        s.totalScore.toFixed(2),
       ]),
     );
   };
@@ -96,7 +116,7 @@ export const AllRoundsTab = () => {
       {/* Filter panel */}
       <div
         className="overflow-hidden transition-all duration-300 ease-in-out"
-        style={{ maxHeight: filtersOpen ? 200 : 0, opacity: filtersOpen ? 1 : 0 }}
+        style={{ maxHeight: filtersOpen ? 240 : 0, opacity: filtersOpen ? 1 : 0 }}
       >
         <div className="flex flex-wrap items-end gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
           <label className="flex flex-col gap-1">
@@ -104,7 +124,7 @@ export const AllRoundsTab = () => {
             <Input
               allowClear
               placeholder="Search id"
-              className="w-48"
+              className="w-40"
               value={filters.id ?? ""}
               onChange={(e) => updateFilter("id", e.target.value)}
             />
@@ -115,9 +135,46 @@ export const AllRoundsTab = () => {
             <Input
               allowClear
               placeholder="Search name"
-              className="w-48"
+              className="w-40"
               value={filters.name ?? ""}
               onChange={(e) => updateFilter("name", e.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">Gender</span>
+            <Select
+              allowClear
+              placeholder="All genders"
+              className="w-40"
+              options={GENDER_OPTIONS}
+              value={filters.gender}
+              onChange={(gender) => updateFilter("gender", gender)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">Province</span>
+            <Select
+              allowClear
+              showSearch={{ optionFilterProp: "label" }}
+              placeholder="All provinces"
+              className="w-48"
+              options={PROVINCE_OPTIONS}
+              value={filters.province}
+              onChange={(province) => updateFilter("province", province)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">Team</span>
+            <Select
+              allowClear
+              placeholder="All teams"
+              className="w-36"
+              options={TEAM_OPTIONS}
+              value={filters.team}
+              onChange={(team) => updateFilter("team", team)}
             />
           </label>
 
@@ -127,26 +184,26 @@ export const AllRoundsTab = () => {
         </div>
       </div>
 
-      {studentsQuery.isError ? (
+      {resultsQuery.isError ? (
         <Alert
           type="error"
           showIcon
-          message="Could not load players."
+          message="Could not load results."
           description={
-            studentsQuery.error instanceof ApiError ? studentsQuery.error.message : undefined
+            resultsQuery.error instanceof ApiError ? resultsQuery.error.message : undefined
           }
         />
-      ) : studentsQuery.isLoading ? (
+      ) : resultsQuery.isLoading ? (
         <div className="flex justify-center py-10">
           <Spin />
         </div>
       ) : (
-        <Table<Student>
+        <Table<AllRounderStudentRow>
           columns={columns}
           dataSource={students}
-          rowKey="id"
+          rowKey="studentId"
           size="small"
-          loading={studentsQuery.isFetching}
+          loading={resultsQuery.isFetching}
           scroll={{ x: "max-content" }}
         />
       )}
