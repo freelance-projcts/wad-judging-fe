@@ -1,18 +1,15 @@
 "use client";
 
-import { Button, Drawer, Form, Input, Select } from "antd";
+import { Button, Checkbox, Drawer, Form, Input, Select, Space } from "antd";
 import { useEffect } from "react";
 
 import {
   EVENT_GENDER_OPTIONS,
   type EventFormValues,
-  type WadEvent,
 } from "./types";
 
 type EventDrawerProps = {
   open: boolean;
-  /** Row being edited, or null when creating. */
-  event: WadEvent | null;
   onClose: () => void;
   onSubmit: (values: EventFormValues) => void;
   submitting?: boolean;
@@ -21,29 +18,42 @@ type EventDrawerProps = {
 const DEFAULTS: EventFormValues = {
   name: "",
   gender: "MALE",
+  supportsMultipleRounds: false,
 };
+
+type RoundsToggleProps = {
+  value?: boolean;
+  onChange?: (value: boolean) => void;
+};
+
+const RoundsToggle = ({ value = false, onChange }: RoundsToggleProps) => (
+  <Space size="large">
+    <Checkbox checked={!value} onChange={() => onChange?.(false)}>
+      Single round
+    </Checkbox>
+    <Checkbox checked={value} onChange={() => onChange?.(true)}>
+      Multiple rounds
+    </Checkbox>
+  </Space>
+);
 
 export const EventDrawer = ({
   open,
-  event,
   onClose,
   onSubmit,
   submitting,
 }: EventDrawerProps) => {
   const [form] = Form.useForm<EventFormValues>();
-  const isEdit = Boolean(event);
 
   useEffect(() => {
     if (!open) return;
     form.resetFields();
-    form.setFieldsValue(
-      event ? { name: event.name, gender: event.gender } : DEFAULTS,
-    );
-  }, [open, event, form]);
+    form.setFieldsValue(DEFAULTS);
+  }, [open, form]);
 
   return (
     <Drawer
-      title={isEdit ? "Edit Event" : "Add Event"}
+      title="Add Event"
       width={440}
       open={open}
       onClose={onClose}
@@ -51,7 +61,7 @@ export const EventDrawer = ({
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
           <Button type="primary" loading={submitting} onClick={form.submit}>
-            {isEdit ? "Save changes" : "Create"}
+            Create
           </Button>
         </div>
       }
@@ -77,6 +87,10 @@ export const EventDrawer = ({
           rules={[{ required: true, message: "Please select a gender." }]}
         >
           <Select options={EVENT_GENDER_OPTIONS} placeholder="Select a gender" />
+        </Form.Item>
+
+        <Form.Item name="supportsMultipleRounds" label="Rounds">
+          <RoundsToggle />
         </Form.Item>
       </Form>
     </Drawer>

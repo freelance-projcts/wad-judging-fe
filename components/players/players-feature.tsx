@@ -12,7 +12,6 @@ import {
   App,
   Button,
   Input,
-  Popconfirm,
   Select,
   Space,
   Table,
@@ -56,7 +55,7 @@ const INITIAL_FILTERS: Filters = {};
 const STUDENTS_QUERY_KEY = "students";
 
 export const PlayersFeature = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
 
   const { data: profile } = useCurrentUser();
@@ -159,8 +158,17 @@ export const PlayersFeature = () => {
   };
 
   const handleDelete = (player: Player) => {
-    deleteMutation.mutate(player.id, {
-      onSuccess: () => message.success(`Removed ${player.fullName}.`),
+    modal.confirm({
+      title: "Remove this player?",
+      content: player.fullName,
+      okText: "Remove",
+      okButtonProps: { danger: true },
+      cancelText: "Cancel",
+      onOk: () => {
+        deleteMutation.mutate(player.id, {
+          onSuccess: () => message.success(`Removed ${player.fullName}.`),
+        });
+      },
     });
   };
 
@@ -211,15 +219,13 @@ export const PlayersFeature = () => {
                   icon={<EditOutlined />}
                   onClick={() => openEdit(player)}
                 />
-                <Popconfirm
-                  title="Remove this player?"
-                  description={player.fullName}
-                  okText="Remove"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => handleDelete(player)}
-                >
-                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                </Popconfirm>
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleDelete(player)}
+                />
               </Space>
             ),
           },

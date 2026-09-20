@@ -5,6 +5,7 @@ export type WadEvent = {
   id: string;
   name: string;
   gender: Gender;
+  supportsMultipleRounds: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -12,6 +13,7 @@ export type WadEvent = {
 export type EventInput = {
   name: string;
   gender: Gender;
+  supportsMultipleRounds: boolean;
 };
 
 export type EventListQuery = { search?: string; gender?: Gender };

@@ -14,6 +14,7 @@ export type { Student } from "@/lib/api/students";
 export type { Performance } from "@/lib/api/performances";
 export type { MarkEntry, RoundInput } from "@/lib/api/marks";
 
+import type { WadEvent } from "@/lib/api/events";
 import type { MarkEntry, RoundInput } from "@/lib/api/marks";
 
 /** One judging position — a row in the Add Marks form, matching the fixed
@@ -34,8 +35,11 @@ export const MARK_POSITIONS: MarkPosition[] = [
   { key: "p", label: "P" },
 ];
 
-/** The competition always scores exactly two rounds per student/event. */
-export const ROUNDS = [1, 2] as const;
+/** How many rounds a student/event pair is judged over — driven by the
+ * event's `supportsMultipleRounds` flag (see wad-judging-be `eventSchema`). */
+export const eventRounds = (
+  event: Pick<WadEvent, "supportsMultipleRounds"> | null | undefined,
+): readonly number[] => (event?.supportsMultipleRounds ? [1, 2] : [1]);
 
 const SCORE_FIELD = {
   d: "dScore",

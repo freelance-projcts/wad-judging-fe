@@ -6,9 +6,10 @@ import { useEffect, useState } from "react";
 
 import { listMarks, submitMarks } from "@/lib/api/marks";
 import { ApiError } from "@/lib/api/client";
+import { TINTS } from "@/constants/brand";
 import {
   MARK_POSITIONS,
-  ROUNDS,
+  eventRounds,
   isRoundTouched,
   markEntryScore,
   markEntrySupervisor,
@@ -45,7 +46,8 @@ export const AddMarkModal = ({
   const queryClient = useQueryClient();
   const [form] = Form.useForm<FormValues>();
 
-  const [activeRound, setActiveRound] = useState(String(ROUNDS[0]));
+  const rounds = eventRounds(event);
+  const [activeRound, setActiveRound] = useState(String(rounds[0]));
 
   const marksQuery = useQuery({
     queryKey: ["marks", performanceId, event?.id, student?.id],
@@ -63,13 +65,13 @@ export const AddMarkModal = ({
   const [lastDataAt, setLastDataAt] = useState<number | null>(null);
   if (open && marksQuery.dataUpdatedAt !== lastDataAt) {
     setLastDataAt(marksQuery.dataUpdatedAt);
-    setActiveRound(String(ROUNDS[0]));
+    setActiveRound(String(rounds[0]));
   }
 
   useEffect(() => {
     if (!open) return;
     const values: FormValues = {};
-    for (const round of ROUNDS) {
+    for (const round of rounds) {
       const entry = existingByRound.get(round);
       const roundValues: RoundFormValues = {};
       for (const { key } of MARK_POSITIONS) {
@@ -106,7 +108,7 @@ export const AddMarkModal = ({
     ]);
 
   const handleFinish = (values: FormValues) => {
-    const editableRounds = ROUNDS.filter(
+    const editableRounds = rounds.filter(
       (round) =>
         (canEditSubmitted || !existingByRound.has(round)) &&
         isRoundTouched(values[roundKey(round)]),
@@ -161,7 +163,7 @@ export const AddMarkModal = ({
           <Tabs
             activeKey={activeRound}
             onChange={setActiveRound}
-            items={ROUNDS.map((round) => {
+            items={rounds.map((round) => {
               const locked = !canEditSubmitted && existingByRound.has(round);
               return {
                 key: String(round),
@@ -177,62 +179,73 @@ export const AddMarkModal = ({
                       />
                     ) : null}
 
-                    {MARK_POSITIONS.map(({ key, label }) => (
+                    {MARK_POSITIONS.map(({ key, label }, index) => {
+                      const tint = TINTS[index % TINTS.length];
+                      return (
                       <div
                         key={key}
-                        className="flex items-center gap-3 rounded-xl bg-blue-50 p-3"
+                        className="flex items-center gap-3 rounded-xl p-3"
+                        style={{ backgroundColor: tint.bg }}
                       >
-                        <span className="flex w-8 shrink-0 items-center justify-center self-stretch font-bold text-blue-600">
+                        <span
+                          className="flex w-8 mb-6! shrink-0 items-center justify-center self-stretch font-bold"
+                          style={{ color: tint.color }}
+                        >
                           {label}
                         </span>
-                        <Form.Item
-                          name={[roundKey(round), key]}
-                          dependencies={roundFieldNames(round)}
-                          rules={[
-                            () => ({
-                              validator(_, value) {
-                                if (!isRoundTouched(form.getFieldValue(roundKey(round)))) {
-                                  return Promise.resolve();
-                                }
-                                return value === null || value === undefined
-                                  ? Promise.reject(new Error("Score is required."))
-                                  : Promise.resolve();
-                              },
-                            }),
-                          ]}
-                          className="mb-0 flex-1"
-                        >
-                          <InputNumber
-                            min={0}
-                            max={10}
-                            step={0.1}
-                            precision={2}
-                            placeholder="Score"
-                            style={{ width: "100%" }}
-                            disabled={locked}
-                          />
-                        </Form.Item>
-                        <Form.Item
-                          name={[roundKey(round), `${key}Supervisor`]}
-                          dependencies={roundFieldNames(round)}
-                          rules={[
-                            () => ({
-                              validator(_, value) {
-                                if (!isRoundTouched(form.getFieldValue(roundKey(round)))) {
-                                  return Promise.resolve();
-                                }
-                                return !value || !String(value).trim()
-                                  ? Promise.reject(new Error("Supervisor is required."))
-                                  : Promise.resolve();
-                              },
-                            }),
-                          ]}
-                          className="mb-0 flex-1"
-                        >
-                          <Input placeholder="Supervisor" disabled={locked} />
-                        </Form.Item>
+                        <div className="min-w-0 flex-1">
+                          <Form.Item
+                            name={[roundKey(round), key]}
+                            dependencies={roundFieldNames(round)}
+                            rules={[
+                              () => ({
+                                validator(_, value) {
+                                  if (!isRoundTouched(form.getFieldValue(roundKey(round)))) {
+                                    return Promise.resolve();
+                                  }
+                                  return value === null || value === undefined
+                                    ? Promise.reject(new Error("Score is required."))
+                                    : Promise.resolve();
+                                },
+                              }),
+                            ]}
+                            className="mb-0"
+                          >
+                            <InputNumber
+                              min={0}
+                              max={10}
+                              step={0.1}
+                              precision={2}
+                              placeholder="Score"
+                              style={{ width: "100%" }}
+                              disabled={locked}
+                            />
+                          </Form.Item>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <Form.Item
+                            name={[roundKey(round), `${key}Supervisor`]}
+                            dependencies={roundFieldNames(round)}
+                            rules={[
+                              () => ({
+                                validator(_, value) {
+                                  if (!isRoundTouched(form.getFieldValue(roundKey(round)))) {
+                                    return Promise.resolve();
+                                  }
+                                  return !value || !String(value).trim()
+                                    ? Promise.reject(new Error("Supervisor is required."))
+                                    : Promise.resolve();
+                                },
+                              }),
+                            ]}
+                            className="mb-0"
+                          >
+                            <Input placeholder="Supervisor" disabled={locked} />
+                          </Form.Item>
+                        </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ),
               };

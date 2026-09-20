@@ -52,7 +52,7 @@ export const EventCard = ({ name, gender, onClick }: EventCardProps) => {
     <button
       type="button"
       onClick={onClick}
-      className="group flex flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-md"
+      className="group flex cursor-pointer flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-md"
     >
       {content}
     </button>

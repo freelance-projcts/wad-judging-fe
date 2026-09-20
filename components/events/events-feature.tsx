@@ -1,16 +1,7 @@
 "use client";
 
-import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
-import {
-  Alert,
-  App,
-  Button,
-  Popconfirm,
-  Space,
-  Table,
-  Tag,
-  type TableProps,
-} from "antd";
+import { PlusOutlined } from "@ant-design/icons";
+import { Alert, App, Button, Table, Tag, type TableProps } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -21,12 +12,7 @@ import {
   type EventGender,
   type WadEvent,
 } from "./types";
-import {
-  createEvent,
-  deleteEvent,
-  listEvents,
-  updateEvent,
-} from "@/lib/api/events";
+import { createEvent, listEvents } from "@/lib/api/events";
 import { ApiError } from "@/lib/api/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 
@@ -53,21 +39,13 @@ export const EventsFeature = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editing, setEditing] = useState<WadEvent | null>(null);
 
   const openCreate = () => {
-    setEditing(null);
-    setDrawerOpen(true);
-  };
-
-  const openEdit = (event: WadEvent) => {
-    setEditing(event);
     setDrawerOpen(true);
   };
 
   const closeDrawer = () => {
     setDrawerOpen(false);
-    setEditing(null);
   };
 
   const invalidateEvents = () =>
@@ -85,41 +63,8 @@ export const EventsFeature = () => {
       message.error(err instanceof ApiError ? err.message : "Could not add event."),
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, values }: { id: string; values: EventFormValues }) =>
-      updateEvent(id, values),
-    onSuccess: () => {
-      invalidateEvents();
-      message.success("Event updated.");
-      closeDrawer();
-    },
-    onError: (err) =>
-      message.error(
-        err instanceof ApiError ? err.message : "Could not update event.",
-      ),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteEvent,
-    onSuccess: () => invalidateEvents(),
-    onError: (err) =>
-      message.error(
-        err instanceof ApiError ? err.message : "Could not remove event.",
-      ),
-  });
-
   const handleSubmit = (values: EventFormValues) => {
-    if (editing) {
-      updateMutation.mutate({ id: editing.id, values });
-    } else {
-      createMutation.mutate(values);
-    }
-  };
-
-  const handleDelete = (event: WadEvent) => {
-    deleteMutation.mutate(event.id, {
-      onSuccess: () => message.success(`Removed ${event.name}.`),
-    });
+    createMutation.mutate(values);
   };
 
   const columns: TableProps<WadEvent>["columns"] = [
@@ -139,34 +84,17 @@ export const EventsFeature = () => {
         <Tag color={GENDER_TAG_COLOR[gender]}>{eventGenderLabel(gender)}</Tag>
       ),
     },
-    ...(isAdmin
-      ? [
-          {
-            title: "Actions",
-            key: "actions",
-            width: 96,
-            render: (_: unknown, event: WadEvent) => (
-              <Space>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={() => openEdit(event)}
-                />
-                <Popconfirm
-                  title="Remove this event?"
-                  description={event.name}
-                  okText="Remove"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => handleDelete(event)}
-                >
-                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                </Popconfirm>
-              </Space>
-            ),
-          },
-        ]
-      : []),
+    {
+      title: "Rounds",
+      dataIndex: "supportsMultipleRounds",
+      key: "supportsMultipleRounds",
+      width: 140,
+      render: (supportsMultipleRounds: boolean) => (
+        <Tag color={supportsMultipleRounds ? "purple" : "default"}>
+          {supportsMultipleRounds ? "Multiple rounds" : "Single round"}
+        </Tag>
+      ),
+    },
   ];
 
   const events = eventsQuery.data ?? [];
@@ -232,10 +160,9 @@ export const EventsFeature = () => {
       {isAdmin ? (
         <EventDrawer
           open={drawerOpen}
-          event={editing}
           onClose={closeDrawer}
           onSubmit={handleSubmit}
-          submitting={createMutation.isPending || updateMutation.isPending}
+          submitting={createMutation.isPending}
         />
       ) : null}
     </div>
