@@ -1,12 +1,11 @@
 "use client";
 
 import { DownloadOutlined, FilterOutlined, UpOutlined } from "@ant-design/icons";
-import { Alert, Button, Input, Select, Spin, Table, type TableProps } from "antd";
+import { Button, Input, Select, Spin, Table, type TableProps } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { getAllRounderResults, type AllRounderStudentRow } from "@/lib/api/results";
-import { ApiError } from "@/lib/api/client";
 import { downloadCsv } from "@/lib/csv";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { GENDER_OPTIONS, PROVINCE_OPTIONS, TEAM_OPTIONS } from "@/lib/domain";
@@ -184,16 +183,7 @@ export const AllRoundsTab = () => {
         </div>
       </div>
 
-      {resultsQuery.isError ? (
-        <Alert
-          type="error"
-          showIcon
-          message="Could not load results."
-          description={
-            resultsQuery.error instanceof ApiError ? resultsQuery.error.message : undefined
-          }
-        />
-      ) : resultsQuery.isLoading ? (
+      {resultsQuery.isLoading ? (
         <div className="flex justify-center py-10">
           <Spin />
         </div>

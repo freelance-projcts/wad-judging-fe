@@ -166,7 +166,6 @@ export const MarksFeature = () => {
             <Button
               type="text"
               size="small"
-              disabled={!performanceId}
               icon={<FormOutlined />}
               onClick={() => setMarkStudent(student)}
             />
@@ -176,7 +175,6 @@ export const MarksFeature = () => {
               <Button
                 type="text"
                 size="small"
-                disabled={!performanceId}
                 icon={<SendOutlined />}
                 onClick={() => setEditRequestStudent(student)}
               />
@@ -201,13 +199,6 @@ export const MarksFeature = () => {
 
       {isAdmin && !performancesQuery.isLoading && availablePerformances.length === 0 ? (
         <Alert type="warning" showIcon message="No performances exist yet." />
-      ) : null}
-      {!isAdmin && profile && availablePerformances.length === 0 ? (
-        <Alert
-          type="warning"
-          showIcon
-          message="You have not been assigned to a performance yet. Contact an admin."
-        />
       ) : null}
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
