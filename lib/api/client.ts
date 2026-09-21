@@ -3,6 +3,11 @@
 // Requests always go to this app's own "/api/*" routes. `next.config.ts`
 // proxies them to the backend so the browser sees a same-origin call and the
 // backend's http-only session cookie works without any CORS setup there.
+// Every request also carries `Authorization: Bearer <token>` when a token is
+// stored (see ./token.ts) - the backend accepts either the cookie or the
+// header, so this works even if the cookie is ever unavailable.
+
+import { getStoredToken } from "./token";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
@@ -38,12 +43,15 @@ export async function apiFetch<T>(
   path: string,
   { body, query, headers, ...rest }: ApiRequestOptions = {},
 ): Promise<T> {
+  const token = getStoredToken();
+
   const response = await fetch(`${API_BASE_URL}${path}${buildQueryString(query)}`, {
     ...rest,
     credentials: "include",
     headers: {
       Accept: "application/json",
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
