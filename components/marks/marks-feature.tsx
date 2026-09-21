@@ -50,19 +50,20 @@ export const MarksFeature = () => {
   const { data: profile } = useCurrentUser();
   const isAdmin = profile?.user.role === "ADMIN";
 
-  // Admins pick from every performance; judges only ever see the ones
-  // they've been granted (GET /profile already returns those for free).
+  // Both tabs are always shown regardless of role or assignment, so every
+  // real Performance record is fetched up front - the ids are needed
+  // whichever tab is picked.
   const performancesQuery = useQuery({
     queryKey: ["performances"],
     queryFn: listPerformances,
-    enabled: isAdmin,
   });
-  const availablePerformances = (isAdmin ? performancesQuery.data : profile?.performances) ?? [];
+  const availablePerformances = performancesQuery.data ?? [];
+  const performanceOne = availablePerformances.find((p) => p.name === "Performance 1");
 
-  // No default worth persisting through an effect: fall back to the first
-  // available performance until the user (if there's more than one) picks one.
+  // Performance 1 is the default tab until the user picks the other one.
   const [performanceOverride, setPerformanceOverride] = useState<string | null>(null);
-  const performanceId = performanceOverride ?? availablePerformances[0]?.id ?? null;
+  const performanceId =
+    performanceOverride ?? performanceOne?.id ?? availablePerformances[0]?.id ?? null;
   const activePerformance = availablePerformances.find((p) => p.id === performanceId) ?? null;
   // Performance 2 only ever works with Performance 1's qualifiers for the same
   // event - so the roster shown here is filtered down to Performance 1's
@@ -197,7 +198,7 @@ export const MarksFeature = () => {
         <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Add Marks</h1>
       </div>
 
-      {isAdmin && !performancesQuery.isLoading && availablePerformances.length === 0 ? (
+      {!performancesQuery.isLoading && availablePerformances.length === 0 ? (
         <Alert type="warning" showIcon message="No performances exist yet." />
       ) : null}
 
@@ -235,17 +236,15 @@ export const MarksFeature = () => {
           </>
         ) : (
           <>
-            {availablePerformances.length > 1 ? (
-              <Tabs
-                type="card"
-                activeKey={performanceId ?? undefined}
-                onChange={setPerformanceOverride}
-                items={availablePerformances
-                  .slice()
-                  .sort((a, b) => a.order - b.order)
-                  .map((p) => ({ key: p.id, label: p.name }))}
-              />
-            ) : null}
+            <Tabs
+              type="card"
+              activeKey={performanceId ?? undefined}
+              onChange={setPerformanceOverride}
+              items={availablePerformances
+                .slice()
+                .sort((a, b) => a.order - b.order)
+                .map((p) => ({ key: p.id, label: p.name }))}
+            />
 
             {/* Toolbar */}
             <div className="mt-3 flex flex-wrap items-center gap-3">
