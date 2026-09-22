@@ -83,6 +83,7 @@ export const AllRoundsTab = () => {
         }),
         s.totalScore.toFixed(2),
       ]),
+      { type: "All Rounders", gender: filters.gender, province: filters.province },
     );
   };
 

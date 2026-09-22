@@ -37,6 +37,7 @@ export const PerformanceTab = () => {
   const [eventId, setEventId] = useState<string | null>(null);
 
   const eventsQuery = useQuery({ queryKey: ["events"], queryFn: () => listEvents() });
+  const selectedEvent = eventsQuery.data?.find((e) => e.id === eventId) ?? null;
 
   const resultsQuery = useQuery({
     queryKey: ["results", "performance-two", eventId],
@@ -59,6 +60,11 @@ export const PerformanceTab = () => {
         teamLabel(s.team),
         s.finalScore.toFixed(2),
       ]),
+      {
+        type: "Performance 2",
+        eventName: resultsQuery.data.eventName,
+        gender: selectedEvent?.gender,
+      },
     );
   };
 

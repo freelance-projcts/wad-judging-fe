@@ -83,7 +83,12 @@ export const TeamPerformanceTab = () => {
           (["A", "B"] as const).map((team) => [group.provinceLabel, `Team ${team}`, totalFor(group, team).toFixed(2)]),
         ),
       },
-    ]);
+    ], {
+      type: "Team Performance",
+      eventName: selectedEvent.name,
+      gender: selectedEvent.gender,
+      province,
+    });
   };
 
   return (

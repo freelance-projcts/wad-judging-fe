@@ -49,6 +49,7 @@ export const TopEightTab = () => {
   const [province, setProvince] = useState<Province | null>(null);
 
   const eventsQuery = useQuery({ queryKey: ["events"], queryFn: () => listEvents() });
+  const selectedEvent = eventsQuery.data?.find((e) => e.id === eventId) ?? null;
 
   const resultsQuery = useQuery({
     queryKey: ["results", "top-8", eventId],
@@ -82,6 +83,12 @@ export const TopEightTab = () => {
         r.finalScore.toFixed(2),
         r.isTopEight ? "Yes" : "No",
       ]),
+      {
+        type: "Top 8",
+        eventName: resultsQuery.data.eventName,
+        gender: selectedEvent?.gender,
+        province,
+      },
     );
   };
 
