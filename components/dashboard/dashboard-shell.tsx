@@ -14,6 +14,7 @@ import {
   MenuOutlined,
   PhoneOutlined,
   TrophyOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
@@ -36,6 +37,8 @@ import {
 } from "@/constants/brand";
 import { initials } from "@/lib/current-user";
 import { logout, roleLabel } from "@/lib/api/auth";
+import { resetDatabase } from "@/lib/api/admins";
+import { ApiError } from "@/lib/api/client";
 import { CURRENT_USER_QUERY_KEY, useCurrentUser } from "@/lib/hooks/use-current-user";
 
 type NavItem = {
@@ -76,6 +79,33 @@ const useLogout = () => {
         }
         queryClient.removeQueries({ queryKey: CURRENT_USER_QUERY_KEY });
         router.replace(ROUTES.LOGIN);
+      },
+    });
+};
+
+const useResetDb = () => {
+  const queryClient = useQueryClient();
+  const { modal, message } = App.useApp();
+
+  return () =>
+    modal.confirm({
+      title: "Reset database?",
+      icon: <WarningOutlined style={{ color: "#dc2626" }} />,
+      content:
+        "This will permanently erase every player, event, mark, and result. This cannot be undone.",
+      okText: "Reset database",
+      okButtonProps: { danger: true },
+      cancelText: "Cancel",
+      onOk: async () => {
+        try {
+          await resetDatabase();
+          await queryClient.invalidateQueries();
+          message.success("Database has been reset.");
+        } catch (err) {
+          message.error(
+            err instanceof ApiError ? err.message : "Could not reset the database.",
+          );
+        }
       },
     });
 };
@@ -171,8 +201,10 @@ const ProfileRow = ({ label, value, icon: Icon }: ProfileFieldRow) => (
 
 const ProfileCard = () => {
   const handleLogout = useLogout();
+  const handleResetDb = useResetDb();
   const { data: profile } = useCurrentUser();
   const user = profile?.user;
+  const isAdmin = user?.role === "ADMIN";
 
   const fields: ProfileFieldRow[] = [
     { label: "Mobile", value: user?.mobileNumber || "—", icon: PhoneOutlined },
@@ -212,6 +244,16 @@ const ProfileCard = () => {
           <LogoutOutlined />
           Logout
         </button>
+        {isAdmin ? (
+          <button
+            type="button"
+            onClick={handleResetDb}
+            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+          >
+            <WarningOutlined />
+            Reset Database
+          </button>
+        ) : null}
       </div>
     </div>
   );
