@@ -1,10 +1,13 @@
 import type { Gender } from "@/lib/domain";
 import { apiFetch } from "./client";
 
+export type EventStatus = "OPEN" | "PERFORMANCE_1_COMPLETE" | "PERFORMANCE_2_COMPLETE";
+
 export type WadEvent = {
   id: string;
   name: string;
   gender: Gender;
+  status: EventStatus;
   supportsMultipleRounds: boolean;
   createdAt: string;
   updatedAt: string;
@@ -37,3 +40,9 @@ export const updateEvent = (id: string, input: EventInput) =>
 
 export const deleteEvent = (id: string) =>
   apiFetch<{ ok: true }>(`/events/${id}`, { method: "DELETE" });
+
+export const updateEventStatus = (id: string, status: EventStatus) =>
+  apiFetch<{ event: WadEvent }>(`/events/${id}/status`, {
+    method: "PUT",
+    body: { status },
+  }).then((res) => res.event);

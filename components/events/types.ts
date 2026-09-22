@@ -6,4 +6,4 @@ export {
   GENDER_OPTIONS as EVENT_GENDER_OPTIONS,
   genderLabel as eventGenderLabel,
 } from "@/lib/domain";
-export type { WadEvent, EventInput as EventFormValues } from "@/lib/api/events";
+export type { WadEvent, EventInput as EventFormValues, EventStatus } from "@/lib/api/events";

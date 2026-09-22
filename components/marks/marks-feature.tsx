@@ -87,7 +87,12 @@ export const MarksFeature = () => {
     setLastEventId(selectedEventId);
     setFilters(selectedEvent ? { gender: selectedEvent.gender } : {});
     setPage(1);
+    setPerformanceOverride(null);
   }
+
+  // Performance 2 only opens up once an admin marks the event's first round
+  // complete (Event.status → PERFORMANCE_1_COMPLETE) — Performance 1 is always open.
+  const performanceTwoLocked = selectedEvent?.status !== "PERFORMANCE_1_COMPLETE";
 
   const [markStudent, setMarkStudent] = useState<Student | null>(null);
   const [editRequestStudent, setEditRequestStudent] = useState<Student | null>(null);
@@ -243,8 +248,21 @@ export const MarksFeature = () => {
               items={availablePerformances
                 .slice()
                 .sort((a, b) => a.order - b.order)
-                .map((p) => ({ key: p.id, label: p.name }))}
+                .map((p) => ({
+                  key: p.id,
+                  label: p.name,
+                  disabled: p.name === "Performance 2" && performanceTwoLocked,
+                }))}
             />
+
+            {performanceTwoLocked && availablePerformances.some((p) => p.name === "Performance 2") ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="Performance 2 opens once this event's Performance 1 is marked complete."
+                className="mt-3!"
+              />
+            ) : null}
 
             {/* Toolbar */}
             <div className="mt-3 flex flex-wrap items-center gap-3">

@@ -1,7 +1,7 @@
 "use client";
 
 import { PlusOutlined } from "@ant-design/icons";
-import { Alert, App, Button, Table, Tag, type TableProps } from "antd";
+import { Alert, App, Button, Switch, Table, Tag, type TableProps } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -12,7 +12,7 @@ import {
   type EventGender,
   type WadEvent,
 } from "./types";
-import { createEvent, listEvents } from "@/lib/api/events";
+import { createEvent, listEvents, updateEventStatus } from "@/lib/api/events";
 import { ApiError } from "@/lib/api/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 
@@ -25,7 +25,7 @@ const GENDER_TAG_COLOR: Record<EventGender, string> = {
 const EVENTS_QUERY_KEY = ["events"] as const;
 
 export const EventsFeature = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
 
   const { data: profile } = useCurrentUser();
@@ -67,6 +67,17 @@ export const EventsFeature = () => {
     createMutation.mutate(values);
   };
 
+  const statusMutation = useMutation({
+    mutationFn: ({ id, enable }: { id: string; enable: boolean }) =>
+      updateEventStatus(id, enable ? "PERFORMANCE_1_COMPLETE" : "OPEN"),
+    onSuccess: () => {
+      invalidateEvents();
+      message.success("Event status updated.");
+    },
+    onError: (err) =>
+      message.error(err instanceof ApiError ? err.message : "Could not update event status."),
+  });
+
   const columns: TableProps<WadEvent>["columns"] = [
     { title: "Id", dataIndex: "id", key: "id", ellipsis: true },
     {
@@ -95,6 +106,46 @@ export const EventsFeature = () => {
         </Tag>
       ),
     },
+    ...(isAdmin
+      ? [
+          {
+            title: "Action",
+            key: "action",
+            width: 220,
+            render: (_: unknown, record: WadEvent) => {
+              const enabled = record.status === "PERFORMANCE_1_COMPLETE";
+              return (
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={enabled}
+                    size="small"
+                    loading={
+                      statusMutation.isPending &&
+                      statusMutation.variables?.id === record.id
+                    }
+                    onChange={() =>
+                      modal.confirm({
+                        title: enabled
+                          ? "Disable performance two and reopen this event?"
+                          : "Enable performance two for this event?",
+                        content: record.name,
+                        okText: enabled ? "Disable" : "Enable",
+                        cancelText: "Cancel",
+                        centered: true,
+                        onOk: () =>
+                          statusMutation.mutate({ id: record.id, enable: !enabled }),
+                      })
+                    }
+                  />
+                  <span className="text-sm font-medium whitespace-nowrap text-slate-700">
+                    Enable performance two
+                  </span>
+                </div>
+              );
+            },
+          },
+        ]
+      : []),
   ];
 
   const events = eventsQuery.data ?? [];
