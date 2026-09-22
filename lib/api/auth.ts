@@ -1,4 +1,5 @@
 import { apiFetch } from "./client";
+import { clearStoredToken, setStoredToken } from "./token";
 
 export type Role = "ADMIN" | "JUDGE";
 
@@ -35,12 +36,20 @@ type AuthResponse = { user: AuthUser; token: string };
 export const roleLabel = (role: Role) => (role === "ADMIN" ? "Admin" : "Judge");
 
 export const login = (input: LoginInput) =>
-  apiFetch<AuthResponse>("/auth/login", { method: "POST", body: input });
+  apiFetch<AuthResponse>("/auth/login", { method: "POST", body: input }).then((res) => {
+    setStoredToken(res.token);
+    return res;
+  });
 
 export const register = (input: RegisterInput) =>
-  apiFetch<AuthResponse>("/auth/register", { method: "POST", body: input });
+  apiFetch<AuthResponse>("/auth/register", { method: "POST", body: input }).then((res) => {
+    setStoredToken(res.token);
+    return res;
+  });
 
 export const logout = () =>
-  apiFetch<{ ok: true }>("/auth/logout", { method: "POST" });
+  apiFetch<{ ok: true }>("/auth/logout", { method: "POST" }).finally(() => {
+    clearStoredToken();
+  });
 
 export const getProfile = () => apiFetch<ProfileResponse>("/profile");
