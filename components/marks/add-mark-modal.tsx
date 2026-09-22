@@ -216,18 +216,20 @@ export const AddMarkModal = ({
                 label: `Round ${round}`,
                 forceRender: true,
                 children: (
-                  <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                  <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1 ">
                     {locked ? (
                       <Alert
                         type="warning"
                         showIcon
                         message="Already submitted — use Send Edit Request to change this round."
+                        className="mb-3!"
                       />
                     ) : unlockedByApproval ? (
                       <Alert
                         type="info"
                         showIcon
                         message="Edit request approved — update the scores and save."
+                         className="mb-3!"
                       />
                     ) : null}
 
