@@ -46,9 +46,9 @@ export const AllRoundsTab = () => {
   };
 
   const columns: TableProps<AllRounderStudentRow>["columns"] = [
-    { title: "Rank", dataIndex: "rank", key: "rank", fixed: "left", width: 64 },
-    { title: "Id", dataIndex: "code", key: "code", fixed: "left" },
-    { title: "Player Name", dataIndex: "fullName", key: "fullName", fixed: "left" },
+    { title: "Rank", dataIndex: "rank", key: "rank", width: 64 },
+    { title: "Id", dataIndex: "code", key: "code" },
+    { title: "Player Name", dataIndex: "fullName", key: "fullName" },
     ...events.map((event) => ({
       title: event.name,
       key: event.id,
@@ -62,7 +62,6 @@ export const AllRoundsTab = () => {
       title: "Total",
       key: "total",
       align: "center" as const,
-      fixed: "right" as const,
       className: "bg-blue-50",
       render: (_: unknown, student: AllRounderStudentRow) => (
         <span className="font-bold text-blue-700">{student.totalScore.toFixed(2)}</span>
