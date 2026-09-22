@@ -160,7 +160,7 @@ export const TeamPerformanceTab = () => {
               ) : null}
               <div className="grid gap-4 p-4 lg:grid-cols-2">
                 {(["A", "B"] as const).map((team) => (
-                  <div key={team}>
+                  <div key={team} className="min-w-0">
                     <h4 className="mb-2 text-sm font-semibold text-slate-700">
                       Team {team} — Top 5
                     </h4>
