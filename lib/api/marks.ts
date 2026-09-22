@@ -63,13 +63,15 @@ export type SubmitMarksInput = {
 };
 
 /**
- * POST /marks upserts one round at a time and only accepts
- * `{ studentId, eventId, performanceId, round, scores: {D,E1,E2,E3,E4,P} }`
- * - there is no `rounds` array and no per-criterion "supervisor" field on the
- * backend (see wad-judging-be/src/lib/validators.ts `markScoresSchema`). The
- * supervisor values stay in the form for the judge's own reference but are
- * dropped here rather than sent, and each touched round is submitted as its
- * own request since the backend won't accept them batched.
+ * POST /marks upserts one round at a time - `{ studentId, eventId,
+ * performanceId, round, scores: {D,E1,E2,E3,E4,P,DSupervisor,...} }` - there
+ * is no `rounds` array, so each touched round is submitted as its own
+ * request. The `*Supervisor` keys are sent alongside their scores for the
+ * backend to persist once it accepts them (see
+ * wad-judging-be/src/lib/validators.ts `markScoresSchema`, which as of this
+ * writing still only validates D/E1/E2/E3/E4/P and silently drops unknown
+ * keys) - update the backend schema/mark-service/Prisma model to actually
+ * store these before relying on them being saved.
  *
  * Overwriting an already-submitted round is only accepted server-side for an
  * admin, or a judge holding an approved (and not-yet-consumed) edit request
@@ -87,11 +89,17 @@ export const submitMarks = async (input: SubmitMarksInput): Promise<MarkEntry[]>
         round: round.round,
         scores: {
           D: round.d,
+          DSupervisor: round.dSupervisor,
           E1: round.e1,
+          E1Supervisor: round.e1Supervisor,
           E2: round.e2,
+          E2Supervisor: round.e2Supervisor,
           E3: round.e3,
+          E3Supervisor: round.e3Supervisor,
           E4: round.e4,
+          E4Supervisor: round.e4Supervisor,
           P: round.p,
+          PSupervisor: round.pSupervisor,
         },
       },
     }).then((res) => res.mark);
