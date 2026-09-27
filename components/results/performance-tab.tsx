@@ -6,30 +6,58 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { listEvents } from "@/lib/api/events";
-import { getPerformanceTwoResults, type PerformanceTwoStudentRow } from "@/lib/api/results";
+import {
+  getPerformanceTwoResults,
+  type PerformanceTwoStudentRow,
+  type RoundMark,
+} from "@/lib/api/results";
 import { ApiError } from "@/lib/api/client";
 import { downloadCsv } from "@/lib/csv";
 import { teamLabel } from "@/lib/domain";
 
+// A multi-round event's Score here can average round 1 and round 2 - the
+// D/E1-E4/P breakdown columns still only show round 1's raw marks (same
+// simplification as the Team Performance and Top 8 tabs).
+const roundOneMark = (student: PerformanceTwoStudentRow): RoundMark | undefined => student.marks[0];
+
+const markCell = (
+  key: "d" | "e1" | "e2" | "e3" | "e4" | "p",
+): NonNullable<TableProps<PerformanceTwoStudentRow>["columns"]>[number] => ({
+  title: key.toUpperCase(),
+  key,
+  width: 56,
+  align: "center",
+  render: (_: unknown, student: PerformanceTwoStudentRow) => roundOneMark(student)?.[key].toFixed(2) ?? "—",
+});
+
 const columns: TableProps<PerformanceTwoStudentRow>["columns"] = [
   { title: "Rank", dataIndex: "rank", key: "rank", width: 64 },
-  { title: "Id", dataIndex: "code", key: "code" },
-  { title: "Name", dataIndex: "fullName", key: "fullName" },
-  { title: "Province", dataIndex: "provinceLabel", key: "provinceLabel" },
+  { title: "Id", dataIndex: "code", key: "code", width: 72 },
+  { title: "Name", dataIndex: "fullName", key: "fullName", width: 160, ellipsis: true },
+  { title: "Province", dataIndex: "provinceLabel", key: "provinceLabel", width: 120 },
   {
     title: "Team",
     dataIndex: "team",
     key: "team",
+    width: 90,
     render: (team: PerformanceTwoStudentRow["team"]) => (
       <Tag color={team ? "blue" : "default"}>{teamLabel(team)}</Tag>
     ),
   },
+  markCell("d"),
+  markCell("e1"),
+  markCell("e2"),
+  markCell("e3"),
+  markCell("e4"),
+  markCell("p"),
   {
     title: "Score",
     dataIndex: "finalScore",
     key: "finalScore",
+    width: 80,
     align: "center",
-    render: (score: number) => score.toFixed(2),
+    className: "bg-blue-50",
+    render: (score: number) => <span className="font-bold text-blue-700">{score.toFixed(2)}</span>,
   },
 ];
 
@@ -51,15 +79,24 @@ export const PerformanceTab = () => {
     if (!resultsQuery.data) return;
     downloadCsv(
       `performance-2-${resultsQuery.data.eventName}.csv`,
-      ["Rank", "Id", "Name", "Province", "Team", "Score"],
-      results.map((s) => [
-        s.rank,
-        s.code,
-        s.fullName,
-        s.provinceLabel,
-        teamLabel(s.team),
-        s.finalScore.toFixed(2),
-      ]),
+      ["Rank", "Id", "Name", "Province", "Team", "D", "E1", "E2", "E3", "E4", "P", "Score"],
+      results.map((s) => {
+        const mark = roundOneMark(s);
+        return [
+          s.rank,
+          s.code,
+          s.fullName,
+          s.provinceLabel,
+          teamLabel(s.team),
+          mark?.d.toFixed(2) ?? "",
+          mark?.e1.toFixed(2) ?? "",
+          mark?.e2.toFixed(2) ?? "",
+          mark?.e3.toFixed(2) ?? "",
+          mark?.e4.toFixed(2) ?? "",
+          mark?.p.toFixed(2) ?? "",
+          s.finalScore.toFixed(2),
+        ];
+      }),
       {
         type: "Performance 2",
         eventName: resultsQuery.data.eventName,

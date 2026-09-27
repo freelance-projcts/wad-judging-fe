@@ -1,12 +1,31 @@
 import type { Gender, Province, Team } from "@/lib/domain";
 import { apiFetch } from "./client";
 
+/** Raw judge marks for a single round — D/E1-E4/P as entered (each with its supervisor), plus that round's own final score. */
+export type RoundMark = {
+  round: number;
+  d: number;
+  dSupervisor: string | null;
+  e1: number;
+  e1Supervisor: string | null;
+  e2: number;
+  e2Supervisor: string | null;
+  e3: number;
+  e3Supervisor: string | null;
+  e4: number;
+  e4Supervisor: string | null;
+  p: number;
+  pSupervisor: string | null;
+  finalScore: number;
+};
+
 export type TeamPerformanceStudentRow = {
   rank: number;
   studentId: string;
   code: string;
   fullName: string;
   finalScore: number;
+  marks: RoundMark[];
   countedTowardTotal: boolean;
 };
 export type TeamPerformanceTeamGroup = {
@@ -38,6 +57,7 @@ export type TopEightStudentRow = {
   fullName: string;
   team: Team | null;
   finalScore: number;
+  marks: RoundMark[];
 };
 export type TopEightProvinceGroup = {
   province: Province;
@@ -64,6 +84,7 @@ export type PerformanceTwoStudentRow = {
   provinceLabel: string;
   team: Team | null;
   finalScore: number;
+  marks: RoundMark[];
 };
 export type PerformanceTwoResponse = {
   eventId: string;

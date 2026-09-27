@@ -8,6 +8,7 @@ import { useState } from "react";
 import { listEvents } from "@/lib/api/events";
 import {
   getTeamPerformanceResults,
+  type RoundMark,
   type TeamPerformanceProvinceGroup,
   type TeamPerformanceStudentRow,
 } from "@/lib/api/results";
@@ -15,16 +16,39 @@ import { ApiError } from "@/lib/api/client";
 import { downloadCsvSections } from "@/lib/csv";
 import { PROVINCE_OPTIONS, type Province } from "@/lib/domain";
 
+// Team Performance only ever scores round 1 (see wad-judging-be result-service.ts
+// `getTeamPerformanceResults` — it fetches with `onlyRoundOne: true`), so a
+// student's `marks` array here has at most one entry.
+const roundOneMark = (student: TeamPerformanceStudentRow): RoundMark | undefined => student.marks[0];
+
+const markCell = (
+  key: "d" | "e1" | "e2" | "e3" | "e4" | "p",
+): NonNullable<TableProps<TeamPerformanceStudentRow>["columns"]>[number] => ({
+  title: key.toUpperCase(),
+  key,
+  width: 56,
+  align: "center",
+  render: (_: unknown, student: TeamPerformanceStudentRow) => roundOneMark(student)?.[key].toFixed(2) ?? "—",
+});
+
 const columns: TableProps<TeamPerformanceStudentRow>["columns"] = [
-  { title: "Rank", dataIndex: "rank", key: "rank", width: 64 },
-  { title: "Id", dataIndex: "code", key: "code" },
-  { title: "Name", dataIndex: "fullName", key: "fullName" },
+  { title: "Rank", dataIndex: "rank", key: "rank", width: 56 },
+  { title: "Id", dataIndex: "code", key: "code", width: 72 },
+  { title: "Name", dataIndex: "fullName", key: "fullName", width: 160, ellipsis: true },
+  markCell("d"),
+  markCell("e1"),
+  markCell("e2"),
+  markCell("e3"),
+  markCell("e4"),
+  markCell("p"),
   {
     title: "Score",
     dataIndex: "finalScore",
     key: "finalScore",
+    width: 72,
     align: "center",
-    render: (score: number) => score.toFixed(2),
+    className: "bg-blue-50",
+    render: (score: number) => <span className="font-bold text-blue-700">{score.toFixed(2)}</span>,
   },
 ];
 
@@ -62,17 +86,26 @@ export const TeamPerformanceTab = () => {
     downloadCsvSections(`team-performance-${selectedEvent.name}${suffix}.csv`, [
       {
         title: "Team Performance",
-        headers: ["Province", "Team", "Rank", "Id", "Name", "Score"],
+        headers: ["Province", "Team", "Rank", "Id", "Name", "D", "E1", "E2", "E3", "E4", "P", "Score"],
         rows: groups.flatMap((group) =>
           (["A", "B"] as const).flatMap((team) =>
-            top5For(group, team).map((s) => [
-              group.provinceLabel,
-              `Team ${team}`,
-              s.rank,
-              s.code,
-              s.fullName,
-              s.finalScore.toFixed(2),
-            ]),
+            top5For(group, team).map((s) => {
+              const mark = roundOneMark(s);
+              return [
+                group.provinceLabel,
+                `Team ${team}`,
+                s.rank,
+                s.code,
+                s.fullName,
+                mark?.d.toFixed(2) ?? "",
+                mark?.e1.toFixed(2) ?? "",
+                mark?.e2.toFixed(2) ?? "",
+                mark?.e3.toFixed(2) ?? "",
+                mark?.e4.toFixed(2) ?? "",
+                mark?.p.toFixed(2) ?? "",
+                s.finalScore.toFixed(2),
+              ];
+            }),
           ),
         ),
       },
@@ -163,7 +196,7 @@ export const TeamPerformanceTab = () => {
                   <h3 className="text-sm font-semibold text-slate-800">{group.provinceLabel}</h3>
                 </div>
               ) : null}
-              <div className="grid gap-4 p-4 lg:grid-cols-2">
+              <div className="grid gap-4 p-4">
                 {(["A", "B"] as const).map((team) => (
                   <div key={team} className="min-w-0">
                     <h4 className="mb-2 text-sm font-semibold text-slate-700">

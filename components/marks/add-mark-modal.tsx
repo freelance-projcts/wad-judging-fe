@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircleFilled } from "@ant-design/icons";
 import { Alert, App, Button, Form, Input, InputNumber, Modal, Spin, Tabs } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -46,6 +47,14 @@ export const AddMarkModal = ({
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [form] = Form.useForm<FormValues>();
+  const [savedMarks, setSavedMarks] = useState<MarkEntry[] | null>(null);
+
+  // The success modal below closes itself 5 seconds after appearing.
+  useEffect(() => {
+    if (!savedMarks) return;
+    const timer = setTimeout(() => setSavedMarks(null), 5000);
+    return () => clearTimeout(timer);
+  }, [savedMarks]);
 
   const rounds = eventRounds(event);
   const [activeRound, setActiveRound] = useState(String(rounds[0]));
@@ -107,14 +116,14 @@ export const AddMarkModal = ({
 
   const submitMutation = useMutation({
     mutationFn: submitMarks,
-    onSuccess: () => {
+    onSuccess: (marks) => {
       queryClient.invalidateQueries({
         queryKey: ["marks", performanceId, event?.id, student?.id],
       });
       // A used approval is deleted server-side (consumed) - refetch so this
       // round shows locked again instead of staying editable from stale data.
       queryClient.invalidateQueries({ queryKey: ["edit-requests"] });
-      message.success("Marks saved.");
+      setSavedMarks(marks);
       onClose();
     },
     onError: (err) =>
@@ -165,6 +174,7 @@ export const AddMarkModal = ({
   };
 
   return (
+    <>
     <Modal
       title={student ? `Marks — ${student.fullName}` : "Marks"}
       open={open}
@@ -314,5 +324,50 @@ export const AddMarkModal = ({
         </Form>
       )}
     </Modal>
+
+    <Modal
+      open={Boolean(savedMarks)}
+      onCancel={() => setSavedMarks(null)}
+      footer={null}
+      closable={false}
+      centered
+      width={360}
+      classNames={{ body: "p-0! overflow-hidden" }}
+    >
+      {savedMarks ? (
+        <div className="bg-gradient-to-b from-emerald-50 to-white px-6 pt-8 pb-6 text-center">
+          <CheckCircleFilled className="text-5xl text-emerald-500" />
+          <h3 className="mt-3 text-lg font-bold text-slate-900">Marks Saved!</h3>
+
+          <div className="mt-5 space-y-2">
+            {savedMarks.map((m) => {
+              const score = Number(m.finalScore);
+              return (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                >
+                  <span className="text-sm font-medium text-slate-600">
+                    {student?.fullName}&apos;s Final Score{savedMarks.length > 1 ? ` — Round ${m.round}` : ""}
+                  </span>
+                  <span className={`text-2xl font-bold ${score < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                    {score.toFixed(2)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSavedMarks(null)}
+            className="mt-6 text-xs font-medium text-slate-400 hover:text-slate-600"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+    </Modal>
+    </>
   );
 };

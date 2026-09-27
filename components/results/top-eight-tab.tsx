@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { listEvents } from "@/lib/api/events";
-import { getTopEightResults, type TopEightStudentRow } from "@/lib/api/results";
+import { getTopEightResults, type RoundMark, type TopEightStudentRow } from "@/lib/api/results";
 import { ApiError } from "@/lib/api/client";
 import { downloadCsv } from "@/lib/csv";
 import { PROVINCE_OPTIONS, teamLabel, type Province } from "@/lib/domain";
@@ -14,32 +14,59 @@ import { toOverallTopEightRanking, type OverallRankedRow } from "@/lib/results-r
 
 type FlatRow = OverallRankedRow<TopEightStudentRow>;
 
+// A multi-round event's Score here averages every round - the D/E1-E4/P
+// breakdown columns still only show round 1's raw marks (same simplification
+// as the Team Performance tab), since there's no single round to show once
+// the score itself is an average.
+const roundOneMark = (row: FlatRow): RoundMark | undefined => row.marks[0];
+
+const markCell = (
+  key: "d" | "e1" | "e2" | "e3" | "e4" | "p",
+): NonNullable<TableProps<FlatRow>["columns"]>[number] => ({
+  title: key.toUpperCase(),
+  key,
+  width: 56,
+  align: "center",
+  render: (_: unknown, row: FlatRow) => roundOneMark(row)?.[key].toFixed(2) ?? "—",
+});
+
 const columns: TableProps<FlatRow>["columns"] = [
   {
     title: "Rank",
     dataIndex: "overallRank",
     key: "overallRank",
-    width: 72,
+    width: 64,
     render: (rank: number, row) => (
       <span className={row.isTopEight ? "font-bold text-amber-700" : undefined}>{rank}</span>
     ),
   },
-  { title: "Id", dataIndex: "code", key: "code" },
-  { title: "Name", dataIndex: "fullName", key: "fullName" },
-  { title: "Province", dataIndex: "provinceLabel", key: "provinceLabel" },
+  { title: "Id", dataIndex: "code", key: "code", width: 72 },
+  { title: "Name", dataIndex: "fullName", key: "fullName", width: 160, ellipsis: true },
+  { title: "Province", dataIndex: "provinceLabel", key: "provinceLabel", width: 120 },
   {
     title: "Team",
     dataIndex: "team",
     key: "team",
+    width: 90,
     render: (team: FlatRow["team"]) => <Tag color={team ? "blue" : "default"}>{teamLabel(team)}</Tag>,
   },
+  markCell("d"),
+  markCell("e1"),
+  markCell("e2"),
+  markCell("e3"),
+  markCell("e4"),
+  markCell("p"),
   {
     title: "Score",
     dataIndex: "finalScore",
     key: "finalScore",
+    width: 80,
     align: "center",
+    className: "bg-blue-50",
     render: (score: number, row) => (
-      <span className={row.isTopEight ? "font-bold text-amber-700" : undefined}>{score.toFixed(2)}</span>
+      <span className={`font-bold ${row.isTopEight ? "text-amber-700" : "text-blue-700"}`}>
+        {score.toFixed(2)}
+      </span>
     ),
   },
 ];
@@ -73,16 +100,25 @@ export const TopEightTab = () => {
     if (!resultsQuery.data) return;
     downloadCsv(
       `top-8-${resultsQuery.data.eventName}.csv`,
-      ["Rank", "Id", "Name", "Province", "Team", "Score", "Top 8"],
-      rows.map((r) => [
-        r.overallRank,
-        r.code,
-        r.fullName,
-        r.provinceLabel,
-        teamLabel(r.team),
-        r.finalScore.toFixed(2),
-        r.isTopEight ? "Yes" : "No",
-      ]),
+      ["Rank", "Id", "Name", "Province", "Team", "D", "E1", "E2", "E3", "E4", "P", "Score", "Top 8"],
+      rows.map((r) => {
+        const mark = roundOneMark(r);
+        return [
+          r.overallRank,
+          r.code,
+          r.fullName,
+          r.provinceLabel,
+          teamLabel(r.team),
+          mark?.d.toFixed(2) ?? "",
+          mark?.e1.toFixed(2) ?? "",
+          mark?.e2.toFixed(2) ?? "",
+          mark?.e3.toFixed(2) ?? "",
+          mark?.e4.toFixed(2) ?? "",
+          mark?.p.toFixed(2) ?? "",
+          r.finalScore.toFixed(2),
+          r.isTopEight ? "Yes" : "No",
+        ];
+      }),
       {
         type: "Top 8",
         eventName: resultsQuery.data.eventName,
