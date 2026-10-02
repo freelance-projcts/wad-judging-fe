@@ -283,7 +283,7 @@ export const AddMarkModal = ({
                           >
                             <InputNumber
                               min={0}
-                              max={10}
+                              max={20}
                               step={0.1}
                               precision={2}
                               placeholder="Score"
