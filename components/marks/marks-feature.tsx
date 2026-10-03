@@ -67,7 +67,7 @@ export const MarksFeature = () => {
   const activePerformance = availablePerformances.find((p) => p.id === performanceId) ?? null;
   // Performance 2 only ever works with Performance 1's qualifiers for the same
   // event - so the roster shown here is filtered down to Performance 1's
-  // overall top 8 (ties included) instead of every registered student.
+  // overall top 10 (ordered by score) instead of every registered student.
   const isPerformanceTwo = activePerformance?.name === "Performance 2";
 
   const eventsQuery = useQuery({ queryKey: ["events"], queryFn: () => listEvents() });
@@ -124,10 +124,13 @@ export const MarksFeature = () => {
   const qualifiedStudentIds = isPerformanceTwo
     ? new Set(
         toOverallTopEightRanking(topEightQuery.data?.provinces ?? [])
-          .filter((r) => r.isTopEight)
+          .slice(0, 10)
           .map((r) => r.studentId),
       )
     : null;
+
+    console.log(qualifiedStudentIds);
+    
 
   const updateFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => {
     setFilters((f) => ({ ...f, [key]: value }));
@@ -192,8 +195,12 @@ export const MarksFeature = () => {
   ];
 
   const allFetchedStudents = studentsQuery.data?.items ?? [];
+  // Keep Performance 2's roster in Performance 1 score order (the Set was built best-first).
+  const qualifiedOrder = qualifiedStudentIds ? [...qualifiedStudentIds] : [];
   const students = qualifiedStudentIds
-    ? allFetchedStudents.filter((s) => qualifiedStudentIds.has(s.id))
+    ? allFetchedStudents
+        .filter((s) => qualifiedStudentIds.has(s.id))
+        .sort((a, b) => qualifiedOrder.indexOf(a.id) - qualifiedOrder.indexOf(b.id))
     : allFetchedStudents;
   const total = qualifiedStudentIds ? students.length : (studentsQuery.data?.total ?? 0);
 
@@ -333,7 +340,7 @@ export const MarksFeature = () => {
             <div className="mt-5">
               {isPerformanceTwo ? (
                 <p className="mb-3 text-xs text-slate-500">
-                  Showing only Performance 1&apos;s overall top 8 (ties included) for this event.
+                  Showing only Performance 1&apos;s overall top 10 for this event, ordered by score.
                 </p>
               ) : null}
 
@@ -352,7 +359,7 @@ export const MarksFeature = () => {
                 <Alert
                   type="error"
                   showIcon
-                  message="Could not load Performance 1's top 8 for this event."
+                  message="Could not load Performance 1's top 10 for this event."
                   description={
                     topEightQuery.error instanceof ApiError
                       ? topEightQuery.error.message
@@ -364,7 +371,7 @@ export const MarksFeature = () => {
                   <Spin />
                 </div>
               ) : isPerformanceTwo && students.length === 0 ? (
-                <Empty description="No Performance 1 top-8 results yet for this event." />
+                <Empty description="No Performance 1 top-10 results yet for this event." />
               ) : (
                 <Table<Student>
                   columns={columns}
