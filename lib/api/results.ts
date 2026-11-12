@@ -1,6 +1,9 @@
 import type { Gender, Province, Team } from "@/lib/domain";
 import { apiFetch } from "./client";
 
+/** Which bucket the backend grouped by - driven by the x-grouping-mode header (1 = PROVINCE, 2 = CLUB). */
+export type ResultsGroupBy = "PROVINCE" | "CLUB";
+
 /** Raw judge marks for a single round — D/E1-E4/P as entered (each with its supervisor), plus that round's own final score. */
 export type RoundMark = {
   round: number;
@@ -39,12 +42,21 @@ export type TeamPerformanceProvinceGroup = {
   provinceLabel: string;
   teams: TeamPerformanceTeamGroup[];
 };
+export type TeamPerformanceClubGroup = {
+  clubId: string;
+  clubName: string;
+  teams: TeamPerformanceTeamGroup[];
+};
 export type TeamPerformanceResponse = {
   eventId: string;
   eventName: string;
   performanceId: string;
   performanceName: string;
+  groupBy: ResultsGroupBy;
+  /** Populated only when groupBy is PROVINCE (top 5 per team count toward teamTotal). */
   provinces: TeamPerformanceProvinceGroup[];
+  /** Populated only when groupBy is CLUB (every student counts toward teamTotal). */
+  clubs: TeamPerformanceClubGroup[];
 };
 
 export const getTeamPerformanceResults = (eventId: string) =>
@@ -55,6 +67,8 @@ export type TopEightStudentRow = {
   studentId: string;
   code: string;
   fullName: string;
+  clubId: string | null;
+  clubName: string | null;
   team: Team | null;
   finalScore: number;
   marks: RoundMark[];
@@ -69,7 +83,11 @@ export type TopEightResponse = {
   eventName: string;
   performanceId: string;
   performanceName: string;
+  groupBy: ResultsGroupBy;
+  /** Top 3 (+ties) per province - populated only when groupBy is PROVINCE. */
   provinces: TopEightProvinceGroup[];
+  /** Flat top 10 (+ties) across all clubs - populated only when groupBy is CLUB. */
+  students: TopEightStudentRow[];
 };
 
 export const getTopEightResults = (eventId: string) =>
@@ -80,8 +98,10 @@ export type PerformanceTwoStudentRow = {
   studentId: string;
   code: string;
   fullName: string;
-  province: Province;
-  provinceLabel: string;
+  province: Province | null;
+  provinceLabel: string | null;
+  clubId: string | null;
+  clubName: string | null;
   team: Team | null;
   finalScore: number;
   marks: RoundMark[];
@@ -104,6 +124,7 @@ export type AllRounderEventBreakdown = {
   performanceName: string | null;
   hasMark: boolean;
   finalScore: number | null;
+  marks: RoundMark[];
 };
 export type AllRounderStudentRow = {
   rank: number;
@@ -111,7 +132,10 @@ export type AllRounderStudentRow = {
   code: string;
   fullName: string;
   gender: Gender;
-  province: Province;
+  province: Province | null;
+  provinceLabel: string | null;
+  clubId: string | null;
+  clubName: string | null;
   team: Team | null;
   totalScore: number;
   eventsScored: number;
@@ -121,7 +145,12 @@ export type AllRounderResponse = {
   events: { id: string; name: string; performanceId: string; performanceName: string | null }[];
   students: AllRounderStudentRow[];
 };
-export type AllRounderQuery = { gender?: Gender; province?: Province; team?: Team };
+export type AllRounderQuery = {
+  gender?: Gender;
+  province?: Province;
+  clubId?: string;
+  team?: Team;
+};
 
 export const getAllRounderResults = (query: AllRounderQuery = {}) =>
   apiFetch<AllRounderResponse>("/results/all-rounders", { query });

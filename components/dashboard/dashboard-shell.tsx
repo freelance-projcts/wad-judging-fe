@@ -13,6 +13,7 @@ import {
   MailOutlined,
   MenuOutlined,
   PhoneOutlined,
+  ShopOutlined,
   TrophyOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
@@ -39,7 +40,8 @@ import { initials } from "@/lib/current-user";
 import { logout, roleLabel } from "@/lib/api/auth";
 import { resetDatabase } from "@/lib/api/admins";
 import { ApiError } from "@/lib/api/client";
-import { CURRENT_USER_QUERY_KEY, useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useIsClubMode } from "@/lib/hooks/use-grouping-mode";
 
 type NavItem = {
   label: string;
@@ -52,6 +54,7 @@ const NAV: NavItem[] = [
   { label: "Home", href: ROUTES.DASHBOARD, icon: HomeOutlined, exact: true },
   { label: "Players", href: ROUTES.PLAYERS, icon: TrophyOutlined },
   { label: "Event", href: ROUTES.EVENT, icon: CalendarOutlined },
+  { label: "Club Management", href: ROUTES.CLUBS, icon: ShopOutlined },
   { label: "Add Marks", href: ROUTES.MARKS, icon: EditOutlined },
   { label: "Results", href: ROUTES.RESULTS, icon: BarChartOutlined },
   { label: "Notifications", href: ROUTES.NOTIFICATIONS, icon: BellOutlined },
@@ -77,7 +80,9 @@ const useLogout = () => {
         } catch {
           // Session may already be gone server-side — clear it locally regardless.
         }
-        queryClient.removeQueries({ queryKey: CURRENT_USER_QUERY_KEY });
+        // Clear everything, not just the current user: the next sign-in may be a
+        // different user or tournament type, and must never see cached data.
+        queryClient.clear();
         router.replace(ROUTES.LOGIN);
       },
     });
@@ -116,7 +121,10 @@ const Sidebar = ({ onNavigate }: SidebarProps) => {
   const pathname = usePathname();
   const { data: profile } = useCurrentUser();
   const isAdmin = profile?.user.role === "ADMIN";
-  const items = NAV.filter((item) => canAccessRoute(item.href, isAdmin));
+  const isClubMode = useIsClubMode();
+  const items = NAV.filter((item) =>
+    canAccessRoute(item.href, { isAdmin, isClubMode }),
+  );
 
   const linkClass = (active: boolean, bright = false) =>
     [

@@ -43,12 +43,16 @@ import {
 import { ApiError } from "@/lib/api/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
+import { useClubs } from "@/lib/hooks/use-clubs";
+import { useGroupingMode } from "@/lib/hooks/use-grouping-mode";
+import { GROUPING_MODE } from "@/lib/api/grouping-mode";
 
 type Filters = {
   name?: string;
   id?: string;
   team?: Team;
   province?: Province;
+  clubId?: string;
 };
 
 const INITIAL_FILTERS: Filters = {};
@@ -60,6 +64,9 @@ export const PlayersFeature = () => {
 
   const { data: profile } = useCurrentUser();
   const isAdmin = profile?.user.role === "ADMIN";
+  const groupingMode = useGroupingMode();
+  const isClubMode = groupingMode === GROUPING_MODE.CLUB;
+  const clubs = useClubs({ enabled: isClubMode });
 
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -76,15 +83,29 @@ export const PlayersFeature = () => {
   const studentsQuery = useQuery({
     queryKey: [
       STUDENTS_QUERY_KEY,
-      { page, pageSize, search, team: filters.team, province: filters.province },
+      {
+        // The backend filters by the x-grouping-mode header, so School and
+        // Club results must never share a cache entry.
+        groupingMode,
+        page,
+        pageSize,
+        search,
+        team: filters.team,
+        province: isClubMode ? undefined : filters.province,
+        clubId: isClubMode ? filters.clubId : undefined,
+      },
     ],
+    // Always hit the API when the Players page opens, even if a cached
+    // list is still inside the global 60s staleTime.
+    refetchOnMount: "always",
     queryFn: () =>
       listStudents({
         page,
         pageSize,
         search: search || undefined,
         team: filters.team,
-        province: filters.province,
+        province: isClubMode ? undefined : filters.province,
+        clubId: isClubMode ? filters.clubId : undefined,
       }),
     placeholderData: (previous) => previous,
   });
@@ -199,12 +220,19 @@ export const PlayersFeature = () => {
       key: "gender",
       render: (gender: Gender) => genderLabel(gender),
     },
-    {
-      title: "Province",
-      dataIndex: "province",
-      key: "province",
-      render: (province: Province) => provinceLabel(province),
-    },
+    isClubMode
+      ? {
+          title: "Club",
+          dataIndex: "clubId",
+          key: "clubId",
+          render: (clubId: string | null) => clubs.clubName(clubId),
+        }
+      : {
+          title: "Province",
+          dataIndex: "province",
+          key: "province",
+          render: (province: Province | null) => provinceLabel(province),
+        },
     ...(isAdmin
       ? [
           {
@@ -314,18 +342,34 @@ export const PlayersFeature = () => {
               />
             </label>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-600">Province</span>
-              <Select
-                allowClear
-                showSearch={{ optionFilterProp: "label" }}
-                placeholder="All provinces"
-                className="w-53"
-                options={PROVINCE_OPTIONS}
-                value={filters.province}
-                onChange={(province) => updateFilter("province", province)}
-              />
-            </label>
+            {isClubMode ? (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-slate-600">Club</span>
+                <Select
+                  allowClear
+                  showSearch={{ optionFilterProp: "label" }}
+                  placeholder="All clubs"
+                  className="w-53"
+                  options={clubs.options}
+                  loading={clubs.isLoading}
+                  value={filters.clubId}
+                  onChange={(clubId) => updateFilter("clubId", clubId)}
+                />
+              </label>
+            ) : (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-slate-600">Province</span>
+                <Select
+                  allowClear
+                  showSearch={{ optionFilterProp: "label" }}
+                  placeholder="All provinces"
+                  className="w-53"
+                  options={PROVINCE_OPTIONS}
+                  value={filters.province}
+                  onChange={(province) => updateFilter("province", province)}
+                />
+              </label>
+            )}
 
             <Button className="ml-auto" onClick={resetFilters}>
               Reset
@@ -377,6 +421,9 @@ export const PlayersFeature = () => {
           onClose={closeDrawer}
           onSubmit={handleSubmit}
           submitting={createMutation.isPending || updateMutation.isPending}
+          isClubMode={isClubMode}
+          clubOptions={clubs.options}
+          clubsLoading={clubs.isLoading}
         />
       ) : null}
     </div>

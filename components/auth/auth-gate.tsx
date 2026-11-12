@@ -7,6 +7,7 @@ import { useEffect, type ReactNode } from "react";
 import ROUTES from "@/constants/routes";
 import { canAccessRoute } from "@/constants/route-access";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useIsClubMode } from "@/lib/hooks/use-grouping-mode";
 
 /** Guards the dashboard routes: redirects to /login when there's no valid
  * session, and keeps each role off routes it can't reach (see constants/route-access.ts). */
@@ -16,7 +17,8 @@ export const AuthGate = ({ children }: { children: ReactNode }) => {
   const { data, isLoading, isError } = useCurrentUser();
   const isAuthenticated = Boolean(data?.user);
   const isAdmin = data?.user.role === "ADMIN";
-  const isAllowed = canAccessRoute(pathname, isAdmin);
+  const isClubMode = useIsClubMode();
+  const isAllowed = canAccessRoute(pathname, { isAdmin, isClubMode });
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {

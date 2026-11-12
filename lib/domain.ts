@@ -47,7 +47,7 @@ const labelFrom = <T extends string>(
 ) => options.find((o) => o.value === value)?.label ?? value;
 
 export const genderLabel = (value: Gender) => labelFrom(GENDER_OPTIONS, value);
-export const provinceLabel = (value: Province) =>
-  labelFrom(PROVINCE_OPTIONS, value);
+export const provinceLabel = (value: Province | null | undefined) =>
+  value ? labelFrom(PROVINCE_OPTIONS, value) : "—";
 export const teamLabel = (value: Team | null | undefined) =>
   value ? labelFrom(TEAM_OPTIONS, value) : "Unassigned";

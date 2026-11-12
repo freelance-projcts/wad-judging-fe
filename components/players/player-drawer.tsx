@@ -18,6 +18,10 @@ type PlayerDrawerProps = {
   onClose: () => void;
   onSubmit: (values: PlayerFormValues) => void;
   submitting?: boolean;
+  /** Club Tournament mode: pick a club instead of a province. */
+  isClubMode: boolean;
+  clubOptions: { label: string; value: string }[];
+  clubsLoading?: boolean;
 };
 
 const DEFAULTS: PlayerFormValues = {
@@ -26,6 +30,7 @@ const DEFAULTS: PlayerFormValues = {
   team: undefined,
   gender: "MALE",
   province: "WESTERN",
+  clubId: undefined,
 };
 
 export const PlayerDrawer = ({
@@ -34,6 +39,9 @@ export const PlayerDrawer = ({
   onClose,
   onSubmit,
   submitting,
+  isClubMode,
+  clubOptions,
+  clubsLoading,
 }: PlayerDrawerProps) => {
   const [form] = Form.useForm<PlayerFormValues>();
   const isEdit = Boolean(player);
@@ -48,7 +56,8 @@ export const PlayerDrawer = ({
             fullName: player.fullName,
             team: player.team ?? undefined,
             gender: player.gender,
-            province: player.province,
+            province: player.province ?? undefined,
+            clubId: player.clubId ?? undefined,
           }
         : DEFAULTS,
     );
@@ -77,7 +86,15 @@ export const PlayerDrawer = ({
         // `team` must be sent as `null` (not omitted) when cleared, since
         // JSON.stringify drops `undefined` keys and the backend would then
         // read a cleared team as "no change" on PATCH instead of "unassign".
-        onFinish={(values) => onSubmit({ ...values, team: values.team ?? null })}
+        // Send only the field for the active mode - the backend rejects a
+        // student carrying both a province and a club.
+        onFinish={({ province, clubId, ...values }) =>
+          onSubmit({
+            ...values,
+            team: values.team ?? null,
+            ...(isClubMode ? { clubId } : { province }),
+          })
+        }
       >
         <Form.Item
           name="code"
@@ -111,17 +128,33 @@ export const PlayerDrawer = ({
           <Select options={GENDER_OPTIONS} placeholder="Select a gender" />
         </Form.Item>
 
-        <Form.Item
-          name="province"
-          label="Province"
-          rules={[{ required: true, message: "Please select a province." }]}
-        >
-          <Select
-            options={PROVINCE_OPTIONS}
-            placeholder="Select a province"
-            showSearch={{ optionFilterProp: "label" }}
-          />
-        </Form.Item>
+        {isClubMode ? (
+          <Form.Item
+            name="clubId"
+            label="Club"
+            rules={[{ required: true, message: "Please select a club." }]}
+          >
+            <Select
+              options={clubOptions}
+              loading={clubsLoading}
+              placeholder="Select a club"
+              showSearch={{ optionFilterProp: "label" }}
+              notFoundContent="No clubs yet - add one in Club Management."
+            />
+          </Form.Item>
+        ) : (
+          <Form.Item
+            name="province"
+            label="Province"
+            rules={[{ required: true, message: "Please select a province." }]}
+          >
+            <Select
+              options={PROVINCE_OPTIONS}
+              placeholder="Select a province"
+              showSearch={{ optionFilterProp: "label" }}
+            />
+          </Form.Item>
+        )}
       </Form>
     </Drawer>
   );

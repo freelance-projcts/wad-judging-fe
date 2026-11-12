@@ -6,7 +6,9 @@ export type Student = {
   code: string;
   fullName: string;
   gender: Gender;
-  province: Province;
+  /** Exactly one of province/clubId is set - School mode uses province, Club mode uses clubId. */
+  province: Province | null;
+  clubId: string | null;
   team: Team | null;
   photoUrl: string | null;
   createdAt: string;
@@ -17,7 +19,8 @@ export type StudentInput = {
   code: string;
   fullName: string;
   gender: Gender;
-  province: Province;
+  province?: Province | null;
+  clubId?: string | null;
   team?: Team | null;
 };
 
@@ -33,6 +36,7 @@ export type StudentListQuery = {
   search?: string;
   gender?: Gender;
   province?: Province;
+  clubId?: string;
   team?: Team;
   page?: number;
   pageSize?: number;

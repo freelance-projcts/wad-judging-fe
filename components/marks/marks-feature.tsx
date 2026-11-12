@@ -43,12 +43,18 @@ import { getTopEightResults } from "@/lib/api/results";
 import { toOverallTopEightRanking } from "@/lib/results-ranking";
 import { ApiError } from "@/lib/api/client";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useClubs } from "@/lib/hooks/use-clubs";
+import { useGroupingMode } from "@/lib/hooks/use-grouping-mode";
+import { GROUPING_MODE } from "@/lib/api/grouping-mode";
 
-type Filters = { gender?: Gender; province?: Province };
+type Filters = { gender?: Gender; province?: Province; clubId?: string };
 
 export const MarksFeature = () => {
   const { data: profile } = useCurrentUser();
   const isAdmin = profile?.user.role === "ADMIN";
+  const groupingMode = useGroupingMode();
+  const isClubMode = groupingMode === GROUPING_MODE.CLUB;
+  const clubs = useClubs({ enabled: isClubMode });
 
   // Both tabs are always shown regardless of role or assignment, so every
   // real Performance record is fetched up front - the ids are needed
@@ -99,16 +105,27 @@ export const MarksFeature = () => {
 
   // Performance 2's roster is filtered client-side to a small qualifier set,
   // so it fetches every matching student up front instead of a server page.
+  // Only the active mode's grouping filter is sent (province OR club).
+  const groupFilter = isClubMode
+    ? { clubId: filters.clubId }
+    : { province: filters.province };
   const studentsQuery = useQuery({
     queryKey: [
       "students",
-      { page, pageSize, gender: filters.gender, province: filters.province, isPerformanceTwo },
+      {
+        groupingMode,
+        page,
+        pageSize,
+        gender: filters.gender,
+        ...groupFilter,
+        isPerformanceTwo,
+      },
     ],
     queryFn: () =>
       listStudents(
         isPerformanceTwo
-          ? { pageSize: 1000, gender: filters.gender, province: filters.province }
-          : { page, pageSize, gender: filters.gender, province: filters.province },
+          ? { pageSize: 1000, gender: filters.gender, ...groupFilter }
+          : { page, pageSize, gender: filters.gender, ...groupFilter },
       ),
     enabled: Boolean(selectedEvent),
     placeholderData: (previous) => previous,
@@ -121,11 +138,16 @@ export const MarksFeature = () => {
     queryFn: () => getTopEightResults(selectedEvent!.id),
     enabled: Boolean(selectedEvent) && isPerformanceTwo,
   });
+  // Club mode: the backend already returns one flat top 10 (+ties) across
+  // all clubs. Province mode: flatten the per-province buckets and take the
+  // overall top 10.
   const qualifiedStudentIds = isPerformanceTwo
     ? new Set(
-        toOverallTopEightRanking(topEightQuery.data?.provinces ?? [])
-          .slice(0, 10)
-          .map((r) => r.studentId),
+        topEightQuery.data?.groupBy === "CLUB"
+          ? topEightQuery.data.students.map((s) => s.studentId)
+          : toOverallTopEightRanking(topEightQuery.data?.provinces ?? [])
+              .slice(0, 10)
+              .map((r) => r.studentId),
       )
     : null;
 
@@ -159,12 +181,19 @@ export const MarksFeature = () => {
         <Tag color={team ? "blue" : "default"}>{teamLabel(team)}</Tag>
       ),
     },
-    {
-      title: "Province",
-      dataIndex: "province",
-      key: "province",
-      render: (province: Province) => provinceLabel(province),
-    },
+    isClubMode
+      ? {
+          title: "Club",
+          dataIndex: "clubId",
+          key: "clubId",
+          render: (clubId: string | null) => clubs.clubName(clubId),
+        }
+      : {
+          title: "Province",
+          dataIndex: "province",
+          key: "province",
+          render: (province: Province | null) => provinceLabel(province),
+        },
     {
       title: "Actions",
       key: "actions",
@@ -311,18 +340,34 @@ export const MarksFeature = () => {
                   />
                 </label>
 
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-slate-600">Province</span>
-                  <Select
-                    allowClear
-                    showSearch={{ optionFilterProp: "label" }}
-                    placeholder="All provinces"
-                    className="w-53"
-                    options={PROVINCE_OPTIONS}
-                    value={filters.province}
-                    onChange={(province) => updateFilter("province", province)}
-                  />
-                </label>
+                {isClubMode ? (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-600">Club</span>
+                    <Select
+                      allowClear
+                      showSearch={{ optionFilterProp: "label" }}
+                      placeholder="All clubs"
+                      className="w-53"
+                      options={clubs.options}
+                      loading={clubs.isLoading}
+                      value={filters.clubId}
+                      onChange={(clubId) => updateFilter("clubId", clubId)}
+                    />
+                  </label>
+                ) : (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-600">Province</span>
+                    <Select
+                      allowClear
+                      showSearch={{ optionFilterProp: "label" }}
+                      placeholder="All provinces"
+                      className="w-53"
+                      options={PROVINCE_OPTIONS}
+                      value={filters.province}
+                      onChange={(province) => updateFilter("province", province)}
+                    />
+                  </label>
+                )}
 
                 <Button
                   className="ml-auto"

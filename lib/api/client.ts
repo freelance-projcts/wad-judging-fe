@@ -8,6 +8,11 @@
 // header, so this works even if the cookie is ever unavailable.
 
 import { getStoredToken } from "./token";
+import {
+  DEFAULT_GROUPING_MODE,
+  GROUPING_MODE_HEADER,
+  getStoredGroupingMode,
+} from "./grouping-mode";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
@@ -44,6 +49,7 @@ export async function apiFetch<T>(
   { body, query, headers, ...rest }: ApiRequestOptions = {},
 ): Promise<T> {
   const token = getStoredToken();
+  const groupingMode = getStoredGroupingMode() ?? DEFAULT_GROUPING_MODE;
 
   const response = await fetch(`${API_BASE_URL}${path}${buildQueryString(query)}`, {
     ...rest,
@@ -52,6 +58,7 @@ export async function apiFetch<T>(
       Accept: "application/json",
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      [GROUPING_MODE_HEADER]: groupingMode,
       ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
