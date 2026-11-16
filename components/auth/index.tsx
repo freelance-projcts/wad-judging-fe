@@ -1,10 +1,10 @@
 "use client";
 
-import { App, Button, Form, Input } from "antd";
+import { App, Button, Form, Input, Radio } from "antd";
 import { LockOutlined, MailOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import ROUTES from "@/constants/routes";
@@ -13,10 +13,18 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { login } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { CURRENT_USER_QUERY_KEY } from "@/lib/hooks/use-current-user";
+import {
+  DEFAULT_GROUPING_MODE,
+  GROUPING_MODE,
+  getStoredGroupingMode,
+  setStoredGroupingMode,
+  type GroupingMode,
+} from "@/lib/api/grouping-mode";
 
 type LoginValues = {
   email: string;
   password: string;
+  groupingMode: GroupingMode;
 };
 
 const LoginFeature = () => {
@@ -26,10 +34,23 @@ const LoginFeature = () => {
   const [form] = Form.useForm<LoginValues>();
   const [submitting, setSubmitting] = useState(false);
 
+  // Restore the last-used tournament type after mount (localStorage isn't
+  // available during SSR, so reading it in render would mismatch hydration).
+  useEffect(() => {
+    const stored = getStoredGroupingMode();
+    if (stored) form.setFieldsValue({ groupingMode: stored });
+  }, [form]);
+
   const onFinish = async (values: LoginValues) => {
     setSubmitting(true);
+    // Store before logging in so the login request itself carries the header.
+    setStoredGroupingMode(values.groupingMode);
     try {
-      await login(values);
+      await login({ email: values.email, password: values.password });
+      // Drop data cached under a previous session / tournament type.
+      queryClient.removeQueries({
+        predicate: (q) => q.queryKey[0] !== CURRENT_USER_QUERY_KEY[0],
+      });
       await queryClient.invalidateQueries({ queryKey: CURRENT_USER_QUERY_KEY });
       message.success("Signed in successfully.");
       router.push(ROUTES.DASHBOARD);
@@ -64,7 +85,19 @@ const LoginFeature = () => {
         requiredMark={false}
         onFinish={onFinish}
         size="large"
+        initialValues={{ groupingMode: DEFAULT_GROUPING_MODE }}
       >
+        <Form.Item
+          name="groupingMode"
+          label="Tournament Type"
+          rules={[{ required: true, message: "Select a tournament type." }]}
+        >
+          <Radio.Group>
+            <Radio value={GROUPING_MODE.SCHOOL}>School Tournament</Radio>
+            <Radio value={GROUPING_MODE.CLUB}>Club Tournament</Radio>
+          </Radio.Group>
+        </Form.Item>
+
         <Form.Item
           name="email"
           label="Email"

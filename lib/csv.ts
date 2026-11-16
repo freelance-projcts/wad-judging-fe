@@ -33,6 +33,8 @@ export type ReportInfo = {
   eventName?: string;
   gender?: Gender;
   province?: Province | null;
+  /** Club Tournament mode: the selected club's name (instead of a province). */
+  club?: string | null;
 };
 
 /** Every exported CSV opens with this banner, matching the department's paper report layout. */
@@ -41,6 +43,7 @@ const reportBanner = (report: ReportInfo): string => {
   const infoLines: string[] = [];
   if (eventLine) infoLines.push(`EVENT : ${eventLine}`);
   if (report.province) infoLines.push(`PROVINCE : ${provinceLabel(report.province)} Province`);
+  if (report.club) infoLines.push(`CLUB : ${report.club}`);
 
   return [
     `NATIONAL SPORTS GAMES - ${new Date().getFullYear()}`,

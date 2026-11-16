@@ -9,12 +9,25 @@ import { listEvents } from "@/lib/api/events";
 import {
   getTeamPerformanceResults,
   type RoundMark,
-  type TeamPerformanceProvinceGroup,
+  type TeamPerformanceResponse,
   type TeamPerformanceStudentRow,
+  type TeamPerformanceTeamGroup,
 } from "@/lib/api/results";
 import { ApiError } from "@/lib/api/client";
 import { downloadCsvSections } from "@/lib/csv";
 import { PROVINCE_OPTIONS, type Province } from "@/lib/domain";
+import { useClubs } from "@/lib/hooks/use-clubs";
+import { useIsClubMode } from "@/lib/hooks/use-grouping-mode";
+
+/** A province (School mode) or club (Club mode) bucket, in one shape. */
+type ResultGroup = { key: string; label: string; teams: TeamPerformanceTeamGroup[] };
+
+const toGroups = (data: TeamPerformanceResponse | undefined): ResultGroup[] =>
+  !data
+    ? []
+    : data.groupBy === "CLUB"
+      ? data.clubs.map((c) => ({ key: c.clubId, label: c.clubName, teams: c.teams }))
+      : data.provinces.map((p) => ({ key: p.province, label: p.provinceLabel, teams: p.teams }));
 
 // Team Performance only ever scores round 1 (see wad-judging-be result-service.ts
 // `getTeamPerformanceResults` — it fetches with `onlyRoundOne: true`), so a
@@ -54,45 +67,54 @@ const columns: TableProps<TeamPerformanceStudentRow>["columns"] = [
 
 export const TeamPerformanceTab = () => {
   const [eventId, setEventId] = useState<string | null>(null);
-  const [province, setProvince] = useState<Province | null>(null);
+  // Province code (School mode) or clubId (Club mode).
+  const [groupKey, setGroupKey] = useState<string | null>(null);
+  const isClubMode = useIsClubMode();
+  const clubs = useClubs({ enabled: isClubMode });
+  const groupNoun = isClubMode ? "club" : "province";
 
   const eventsQuery = useQuery({ queryKey: ["events"], queryFn: () => listEvents() });
   const selectedEvent = eventsQuery.data?.find((e) => e.id === eventId) ?? null;
 
   const resultsQuery = useQuery({
-    queryKey: ["results", "team-performance", eventId],
+    queryKey: ["results", "team-performance", eventId, isClubMode],
     queryFn: () => getTeamPerformanceResults(eventId!),
     enabled: Boolean(eventId),
   });
 
-  const allGroups = resultsQuery.data?.provinces ?? [];
-  // Province is optional: with one picked, show just that province; otherwise show every province.
-  const groups = province ? allGroups.filter((p) => p.province === province) : allGroups;
+  const allGroups = toGroups(resultsQuery.data);
+  // The province/club filter is optional: with one picked, show just that group.
+  const groups = groupKey ? allGroups.filter((g) => g.key === groupKey) : allGroups;
+  const isClubResult = resultsQuery.data?.groupBy === "CLUB";
 
-  // Only the top 5 (already ranked top-to-bottom, highest score first) count
-  // toward the team total - the rest are excluded from this view entirely.
-  const top5For = (group: TeamPerformanceProvinceGroup, team: "A" | "B") =>
-    (group.teams.find((t) => t.team === team)?.students ?? [])
-      .filter((s) => s.countedTowardTotal)
-      .slice(0, 5);
-  const totalFor = (group: TeamPerformanceProvinceGroup, team: "A" | "B") =>
+  // Only students counted toward the team total are shown (already ranked
+  // highest first). School mode caps that at the top 5; Club mode counts
+  // every student in the club + team, so there's no cutoff.
+  const countedFor = (group: ResultGroup, team: "A" | "B") => {
+    const counted = (group.teams.find((t) => t.team === team)?.students ?? []).filter(
+      (s) => s.countedTowardTotal,
+    );
+    return isClubResult ? counted : counted.slice(0, 5);
+  };
+  const totalFor = (group: ResultGroup, team: "A" | "B") =>
     group.teams.find((t) => t.team === team)?.teamTotal ?? 0;
+  const groupHeader = isClubResult ? "Club" : "Province";
 
   const canExport = groups.length > 0;
 
   const handleExport = () => {
     if (!selectedEvent || groups.length === 0) return;
-    const suffix = province ? `-${groups[0].provinceLabel}` : "";
+    const suffix = groupKey ? `-${groups[0].label}` : "";
     downloadCsvSections(`team-performance-${selectedEvent.name}${suffix}.csv`, [
       {
         title: "Team Performance",
-        headers: ["Province", "Team", "Rank", "Id", "Name", "D", "E1", "E2", "E3", "E4", "P", "Score"],
+        headers: [groupHeader, "Team", "Rank", "Id", "Name", "D", "E1", "E2", "E3", "E4", "P", "Score"],
         rows: groups.flatMap((group) =>
           (["A", "B"] as const).flatMap((team) =>
-            top5For(group, team).map((s) => {
+            countedFor(group, team).map((s) => {
               const mark = roundOneMark(s);
               return [
-                group.provinceLabel,
+                group.label,
                 `Team ${team}`,
                 s.rank,
                 s.code,
@@ -111,16 +133,17 @@ export const TeamPerformanceTab = () => {
       },
       {
         title: "Team Totals",
-        headers: ["Province", "Team", "Total"],
+        headers: [groupHeader, "Team", "Total"],
         rows: groups.flatMap((group) =>
-          (["A", "B"] as const).map((team) => [group.provinceLabel, `Team ${team}`, totalFor(group, team).toFixed(2)]),
+          (["A", "B"] as const).map((team) => [group.label, `Team ${team}`, totalFor(group, team).toFixed(2)]),
         ),
       },
     ], {
       type: "Team Performance",
       eventName: selectedEvent.name,
       gender: selectedEvent.gender,
-      province,
+      province: !isClubResult && groupKey ? (groupKey as Province) : null,
+      club: isClubResult && groupKey ? groups[0].label : null,
     });
   };
 
@@ -136,23 +159,26 @@ export const TeamPerformanceTab = () => {
             value={eventId ?? undefined}
             onChange={(value) => {
               setEventId(value);
-              setProvince(null);
+              setGroupKey(null);
             }}
             options={(eventsQuery.data ?? []).map((e) => ({ label: e.name, value: e.id }))}
           />
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-600">Province (optional)</span>
-          <Select
+          <span className="text-xs font-medium text-slate-600">
+            {isClubMode ? "Club" : "Province"} (optional)
+          </span>
+          <Select<string>
             allowClear
             className="w-53"
-            placeholder="All provinces"
+            placeholder={isClubMode ? "All clubs" : "All provinces"}
             disabled={!eventId}
+            loading={isClubMode && clubs.isLoading}
             showSearch={{ optionFilterProp: "label" }}
-            value={province ?? undefined}
-            onChange={(value) => setProvince(value ?? null)}
-            options={PROVINCE_OPTIONS}
+            value={groupKey ?? undefined}
+            onChange={(value) => setGroupKey(value ?? null)}
+            options={isClubMode ? clubs.options : PROVINCE_OPTIONS}
           />
         </label>
 
@@ -184,27 +210,30 @@ export const TeamPerformanceTab = () => {
       ) : groups.length === 0 ? (
         <Empty
           description={
-            province ? "No marks recorded for this province yet" : "No marks recorded for this event yet"
+            groupKey
+              ? `No marks recorded for this ${groupNoun} yet`
+              : "No marks recorded for this event yet"
           }
         />
       ) : (
         <div className="space-y-6">
           {groups.map((group) => (
-            <div key={group.province} className="overflow-hidden rounded-xl border border-slate-200">
-              {!province ? (
+            <div key={group.key} className="overflow-hidden rounded-xl border border-slate-200">
+              {!groupKey ? (
                 <div className="border-b border-slate-200 bg-slate-100 px-4 py-2">
-                  <h3 className="text-sm font-semibold text-slate-800">{group.provinceLabel}</h3>
+                  <h3 className="text-sm font-semibold text-slate-800">{group.label}</h3>
                 </div>
               ) : null}
               <div className="grid gap-4 p-4">
                 {(["A", "B"] as const).map((team) => (
                   <div key={team} className="min-w-0">
                     <h4 className="mb-2 text-sm font-semibold text-slate-700">
-                      Team {team} — Top 5
+                      Team {team}
+                      {isClubResult ? "" : " — Top 5"}
                     </h4>
                     <Table<TeamPerformanceStudentRow>
                       columns={columns}
-                      dataSource={top5For(group, team)}
+                      dataSource={countedFor(group, team)}
                       rowKey="studentId"
                       size="small"
                       pagination={false}

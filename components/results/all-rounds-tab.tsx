@@ -10,23 +10,38 @@ import { downloadCsv } from "@/lib/csv";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { GENDER_OPTIONS, PROVINCE_OPTIONS, TEAM_OPTIONS } from "@/lib/domain";
 import type { Gender, Province, Team } from "@/lib/domain";
+import { useClubs } from "@/lib/hooks/use-clubs";
+import { useIsClubMode } from "@/lib/hooks/use-grouping-mode";
 
 const MARKS_PLACEHOLDER = "—";
 
-type Filters = { id?: string; name?: string; gender?: Gender; province?: Province; team?: Team };
+type Filters = {
+  id?: string;
+  name?: string;
+  gender?: Gender;
+  province?: Province;
+  clubId?: string;
+  team?: Team;
+};
 
 export const AllRoundsTab = () => {
   const [filters, setFilters] = useState<Filters>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const isClubMode = useIsClubMode();
+  const clubs = useClubs({ enabled: isClubMode });
+  // Only the active mode's grouping filter is sent (province OR club).
+  const province = isClubMode ? undefined : filters.province;
+  const clubId = isClubMode ? filters.clubId : undefined;
 
   const search = useDebouncedValue(filters.id || filters.name || "", 350);
 
   const resultsQuery = useQuery({
-    queryKey: ["results", "all-rounds", filters.gender, filters.province, filters.team],
+    queryKey: ["results", "all-rounds", filters.gender, province, clubId, filters.team],
     queryFn: () =>
       getAllRounderResults({
         gender: filters.gender,
-        province: filters.province,
+        province,
+        clubId,
         team: filters.team,
       }),
   });
@@ -83,7 +98,12 @@ export const AllRoundsTab = () => {
         }),
         s.totalScore.toFixed(2),
       ]),
-      { type: "All Rounders", gender: filters.gender, province: filters.province },
+      {
+        type: "All Rounders",
+        gender: filters.gender,
+        province,
+        club: clubId ? clubs.clubName(clubId) : null,
+      },
     );
   };
 
@@ -152,18 +172,34 @@ export const AllRoundsTab = () => {
             />
           </label>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">Province</span>
-            <Select
-              allowClear
-              showSearch={{ optionFilterProp: "label" }}
-              placeholder="All provinces"
-              className="w-48"
-              options={PROVINCE_OPTIONS}
-              value={filters.province}
-              onChange={(province) => updateFilter("province", province)}
-            />
-          </label>
+          {isClubMode ? (
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-slate-600">Club</span>
+              <Select
+                allowClear
+                showSearch={{ optionFilterProp: "label" }}
+                placeholder="All clubs"
+                className="w-48"
+                options={clubs.options}
+                loading={clubs.isLoading}
+                value={filters.clubId}
+                onChange={(value) => updateFilter("clubId", value)}
+              />
+            </label>
+          ) : (
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-slate-600">Province</span>
+              <Select
+                allowClear
+                showSearch={{ optionFilterProp: "label" }}
+                placeholder="All provinces"
+                className="w-48"
+                options={PROVINCE_OPTIONS}
+                value={filters.province}
+                onChange={(value) => updateFilter("province", value)}
+              />
+            </label>
+          )}
 
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-slate-600">Team</span>

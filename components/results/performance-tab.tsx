@@ -20,6 +20,10 @@ import { teamLabel } from "@/lib/domain";
 // simplification as the Team Performance and Top 8 tabs).
 const roundOneMark = (student: PerformanceTwoStudentRow): RoundMark | undefined => student.marks[0];
 
+// Exactly one of province/club is set per student, depending on the mode
+// they were registered under.
+const groupLabelOf = (s: PerformanceTwoStudentRow) => s.clubName ?? s.provinceLabel ?? "—";
+
 const markCell = (
   key: "d" | "e1" | "e2" | "e3" | "e4" | "p",
 ): NonNullable<TableProps<PerformanceTwoStudentRow>["columns"]>[number] => ({
@@ -34,7 +38,12 @@ const columns: TableProps<PerformanceTwoStudentRow>["columns"] = [
   { title: "Rank", dataIndex: "rank", key: "rank", width: 64 },
   { title: "Id", dataIndex: "code", key: "code", width: 72 },
   { title: "Name", dataIndex: "fullName", key: "fullName", width: 160, ellipsis: true },
-  { title: "Province", dataIndex: "provinceLabel", key: "provinceLabel", width: 120 },
+  {
+    title: "Province / Club",
+    key: "group",
+    width: 140,
+    render: (_: unknown, s: PerformanceTwoStudentRow) => groupLabelOf(s),
+  },
   {
     title: "Team",
     dataIndex: "team",
@@ -79,14 +88,14 @@ export const PerformanceTab = () => {
     if (!resultsQuery.data) return;
     downloadCsv(
       `performance-2-${resultsQuery.data.eventName}.csv`,
-      ["Rank", "Id", "Name", "Province", "Team", "D", "E1", "E2", "E3", "E4", "P", "Score"],
+      ["Rank", "Id", "Name", "Province / Club", "Team", "D", "E1", "E2", "E3", "E4", "P", "Score"],
       results.map((s) => {
         const mark = roundOneMark(s);
         return [
           s.rank,
           s.code,
           s.fullName,
-          s.provinceLabel,
+          groupLabelOf(s),
           teamLabel(s.team),
           mark?.d.toFixed(2) ?? "",
           mark?.e1.toFixed(2) ?? "",
